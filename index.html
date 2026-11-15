@@ -737,7 +737,141 @@ soundUpdate=function(){
   whisG.gain.value=st.turbo?Math.min(0.08,sim.boost*0.09):0;
  }
 };
-toMenu();requestAnimationFrame(loop);
+// ===== PART 11: CAR LADDER, NAMES, PER-CAR CAREER, PRICES =====
+
+// Rebuild the car list in place so older code still sees CARS and save.car
+CARS.length=0;
+CARS.push(
+ {n:'Nizzan Silvana',mass:1250,hp:230,grip:1.00,gears:[3.6,2.2,1.5,1.1,0.85],price:0,snd:0,drv:'RWD'},
+ {n:'Hold On GTS',mass:1700,hp:400,grip:0.95,gears:[3.2,2.0,1.4,1.0,0.8],price:18000,snd:1,drv:'RWD V8'},
+ {n:'Rotary Rocket',mass:1300,hp:340,grip:1.08,gears:[3.8,2.3,1.6,1.15,0.9],price:32000,snd:2,drv:'RWD rotary'},
+ {n:'Toyoda Supreme',mass:1500,hp:520,grip:1.15,gears:[3.5,2.15,1.5,1.1,0.85],price:55000,snd:3,drv:'RWD turbo six'},
+ {n:'BMW-ish Beamer',mass:1550,hp:650,grip:1.22,gears:[3.4,2.1,1.5,1.1,0.85],price:90000,snd:3,drv:'RWD twin turbo'},
+ {n:'Golden Godzilla',mass:1450,hp:760,grip:1.30,gears:[3.5,2.2,1.55,1.15,0.88],price:0,snd:4,drv:'AWD gold',gold:true}
+);
+const GOLD_ID2=5,LAST_REG=4;
+// Keep older code pointing at the right gold car
+GOLD_ID_FIX=GOLD_ID2;
+
+// Career: each car owns a block of levels
+const BLOCKS=[[1,3],[4,6],[7,9],[10,12],[13,15]];
+function carForLevel(L){
+ if(L>=16)return GOLD_ID2;
+ for(let i=0;i<BLOCKS.length;i++)if(L>=BLOCKS[i][0]&&L<=BLOCKS[i][1])return i;
+ return 0;
+}
+function posInBlock(L){const b=BLOCKS[carForLevel(L)];return L-b[0]}
+
+// Per-car gates. First level of each car is free, then it asks for more.
+meetsGate=function(L){
+ if(carForLevel(L)!==save.car)return false;
+ const p=posInBlock(L);
+ if(L===16)return lvl('goldturbo')>=1;
+ if(L===15)return upCount(5)>=8;
+ if(p===0)return true;
+ if(p===1)return lvl('engine')>=1+Math.floor(L/6)&&lvl('turbo')>=1+Math.floor(L/6);
+ return lvl('engine')>=2+Math.floor(L/5)&&lvl('turbo')>=2+Math.floor(L/5)&&lvl('grip')>=2+Math.floor(L/6)&&upCount(2+Math.floor(L/6))>=Math.min(8,3+Math.floor(L/3));
+};
+surplus=function(L){
+ let s=0;
+ UPG.forEach(u=>{if(u!=='goldturbo')s+=lvl(u)});
+ return s-Math.min(40,L*2);
+};
+
+// Scaled prices: upgrade cost grows with the level and with the car's own price
+function upCost(u){
+ const l=lvl(u),c=CARS[save.car];
+ const base=700+c.price*0.035;
+ return Math.round(base*Math.pow(1.85,l)/50)*50;
+}
+const GOLD_TURBO_COST2=120000;
+
+// Winnings scale with the level so progress is doable but takes real grinding
+function prizeFor(L,half){
+ return Math.round((half?1.7:1)*(900+L*420));
+}
+
+// Specs readout used by the garage buttons
+function specLine(c){
+ const zero=(c.hp/c.mass*1000).toFixed(0);
+ return c.hp+' hp | '+c.mass+' kg | grip '+c.grip.toFixed(2)+' | '+c.gears.length+' speed | '+zero+' hp per tonne';
+}
+
+// Menu rebuilt with specs, locked levels, and per-car upgrade table
+toMenu=function(){
+ if(sim&&sim.falseStart){const d=dist;sim=null;dist=d;startRace();return}
+ mode='menu';sim=null;traffic=[];
+ const m=document.getElementById('menu');m.classList.remove('hide');
+ const c=CARS[save.car],L=Math.min(save.level,16),need=carForLevel(L);
+ let html='<h1>DRAG RACING SIM</h1><h3>Cash: $'+save.cash+'  |  Car: '+c.n+'  |  Career level: '+L+(save.done?' (COMPLETE)':'')+'</h3>';
+ html+='<h3>Career race: level '+L+'</h3>';
+ if(need!==save.car){
+  html+='<p style="color:#fa0">Level '+L+' needs the '+CARS[need].n+(save.owned.includes(need)?'. Select it in the garage.':'. Buy it in the garage first.')+'</p>';
+ }
+ html+='<button onclick="dist=402;startRace()">Race quarter mile</button><button onclick="dist=805;startRace()">Race half mile</button>';
+ if(save.level>1)html+='<button onclick="save.level--;store();toMenu()">Replay easier level</button>';
+ html+='<h3>Free roam</h3><button onclick="startFree()">Cruise the highway</button>';
+ html+='<h3>Garage</h3>';
+ CARS.forEach((car,i)=>{
+  if(car.gold&&!save.gold)return;
+  const own=save.owned.includes(i);
+  html+='<div><button onclick="buyCar('+i+')">'+car.n+(own?(save.car===i?' (driving)':' (owned, select)'):' - $'+car.price)+'</button><br><small style="color:#8cf">'+specLine(car)+'</small></div>';
+ });
+ html+='<h3>Upgrades for '+c.n+'</h3><small style="color:#8cf">Each car has its own upgrades.</small><br>';
+ UPG.forEach(u=>{
+  if(u==='goldturbo'){
+   if(!save.gold||save.car!==GOLD_ID2)return;
+   html+='<button onclick="buyUp(\'goldturbo\')" style="border-color:gold;color:gold">Golden Turbo '+(lvl(u)>=1?'INSTALLED':'- $'+GOLD_TURBO_COST2)+'</button>';
+   return;
+  }
+  const l=lvl(u);
+  html+='<button onclick="buyUp(\''+u+'\')">'+u+' L'+l+(l>=5?' MAX':' - $'+upCost(u))+'</button>';
+ });
+ html+='<p>Slide up on the right to accelerate. Hold the throttle at the lights for launch control. Tap UP and DOWN to shift. Tap NOS for nitrous. Tap MENU to leave a race.</p>';
+ m.innerHTML=html;
+};
+buyUp=function(u){
+ if(u==='goldturbo'){
+  if(lvl(u)<1&&save.cash>=GOLD_TURBO_COST2){save.cash-=GOLD_TURBO_COST2;save.up[save.car+u]=1;store()}
+  toMenu();return;
+ }
+ const l=lvl(u),cost=upCost(u);
+ if(l<5&&save.cash>=cost){save.cash-=cost;save.up[save.car+u]=l+1;store()}
+ toMenu();
+};
+
+// Engine sound follows the car, using the five profiles from Part 8
+const _sndKeyP11=soundUpdate;
+soundUpdate=function(){
+ const real=save.car;
+ save.car=CARS[real].snd;
+ try{_sndKeyP11()}finally{save.car=real}
+};
+
+// Payouts: replace the flat prize with the level scaled one
+const _raceFlowP11=raceFlow;
+raceFlow=function(dt){
+ const S=sim;
+ const before=S&&!S.paid;
+ const cashBefore=save.cash;
+ _raceFlowP11(dt);
+ if(before&&S&&S.paid&&!S.falseStart&&!S.foul){
+  // undo the old payout, apply the scaled one
+  const gained=save.cash-cashBefore;
+  save.cash=cashBefore;
+  const full=prizeFor(save.level>1&&S.win?save.level-1:save.level,dist>500);
+  save.cash+=S.win?full:Math.round(full*0.18);
+  store();
+ }
+};
+
+// Make sure a new save has the right starting state
+if(save.level===undefined)save.level=1;
+save.owned=save.owned.filter(i=>i<CARS.length);
+if(!save.owned.includes(0))save.owned.push(0);
+if(save.car>=CARS.length)save.car=0;
+if(save.gold&&!save.owned.includes(GOLD_ID2))save.owned.push(GOLD_ID2);
+ toMenu();requestAnimationFrame(loop);
 </script>
 </body>
 </html>  
