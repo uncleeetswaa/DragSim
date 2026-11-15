@@ -482,7 +482,262 @@ drawCockpit=function(){_oldDraw();drawTouchUI()};
 const menuFix=document.createElement('style');
 menuFix.textContent='#menu button{font-size:20px;padding:16px 22px;margin:8px}#menu{font-size:18px;-webkit-user-select:none;user-select:none}';
 document.head.appendChild(menuFix);
- toMenu();requestAnimationFrame(loop);
+// ===== PART 7: CAREER, SECRET LEVEL, ENDING, RUMBLE =====
+
+// ---- Save data for career ----
+if(save.level===undefined)save.level=1;
+if(!save.gold)save.gold=false;
+if(!save.done)save.done=false;
+
+// ---- Gold R34 car, added to the garage once unlocked ----
+CARS.push({n:'Gold R34 GTR',mass:1450,hp:700,grip:1.25,gears:[3.5,2.2,1.55,1.15,0.88],price:0,gold:true});
+const GOLD_ID=CARS.length-1;
+UPG.push('goldturbo');
+const GOLD_TURBO_COST=75000;
+
+// ---- Gate for each level: returns how ready the player is ----
+function upCount(minLvl){
+ let n=0;
+ UPG.forEach(u=>{if(u!=='goldturbo'&&lvl(u)>=minLvl)n++});
+ return n;
+}
+function meetsGate(L){
+ if(L<=4)return true;
+ if(L===5)return lvl('engine')>=2&&lvl('turbo')>=2&&lvl('grip')>=2;
+ if(L<=9)return lvl('engine')>=3&&lvl('turbo')>=3&&lvl('grip')>=3;
+ if(L<=14)return upCount(4)>=4;
+ if(L===15)return upCount(5)>=8;
+ if(L===16)return lvl('goldturbo')>=1&&save.car===GOLD_ID;
+ return true;
+}
+// How far above the gate the player is, used to decide how easy the win is
+function surplus(L){
+ let s=0;
+ UPG.forEach(u=>{if(u!=='goldturbo')s+=lvl(u)});
+ const need=[0,0,0,0,0,6,9,9,9,9,16,18,20,22,24,40];
+ return s-(need[L]||0);
+}
+
+// ---- Opponent speed is now decided by the career level ----
+stepOpp=function(dt){
+ const S=sim,o=S.opp;
+ if(!o||!S.started)return;
+ const L=save.level,ok=meetsGate(L);
+ const pace=Math.max(S.v,6+S.t*7);
+ let k;
+ if(!ok)k=1.03; // under-upgraded: the rival is faster than you
+ else k=Math.max(0.90,0.985-Math.min(0.08,surplus(L)*0.004)); // above the gate: easier
+ const aim=pace*k;
+ o.v+=(aim-o.v)*Math.min(1,dt*2.2);
+ o.x+=o.v*dt;
+ if(ok){
+  const gapBehind=0.6+Math.min(2.5,S.v*0.04);
+  if(o.x>S.x-gapBehind)o.x=S.x-gapBehind;
+ }else{
+  // rival pulls just ahead of you
+  const lead=1+Math.min(4,S.v*0.05);
+  if(o.x<S.x+lead)o.x=S.x+lead;
+ }
+ if(o.x<0)o.x=0;
+};
+
+// ---- Race flow with career results ----
+raceFlow=function(dt){
+ const S=sim;
+ if(mode!=='race')return;
+ if(!S.started){
+  S.lightT+=dt;
+  S.lights=Math.min(3,Math.floor(S.lightT/0.8));
+  if(S.lightT>3.2){S.started=true;S.lights=4}
+  return;
+ }
+ S.t+=dt;
+ stepOpp(dt);
+ const L=save.level;
+ if(!S.finished&&S.x>=dist){
+  S.finished=true;S.et=S.t;S.trap=S.v*2.237;
+  S.win=S.opp.x<dist&&meetsGate(L);
+  S.doneAt=performance.now();
+ }
+ if(!S.finished&&S.opp&&S.opp.x>=dist){
+  S.finished=true;S.et=S.t;S.trap=S.v*2.237;S.win=false;S.doneAt=performance.now();
+ }
+ if(S.finished&&!S.paid){
+  S.paid=true;
+  const base=dist>500?2500:1500;
+  if(S.win){
+   const prize=Math.round(base*(1+L*0.35));
+   save.cash+=prize;
+   S.result='LEVEL '+L+' WON  +$'+prize+'  ET '+S.et.toFixed(2)+'s';
+   if(L===save.level&&L<16)save.level=L+1;
+   if(L===15){
+    save.gold=true;
+    if(!save.owned.includes(GOLD_ID))save.owned.push(GOLD_ID);
+    S.result='LEVEL 15 WON! SECRET LEVEL 16 UNLOCKED';
+   }
+   if(L===16){save.done=true;S.ending=true;S.endT=0}
+  }else{
+   const prize=Math.round(base*0.2);
+   save.cash+=prize;
+   const hintTxt=L===5?'Need engine, turbo, grip at 2':L<=9?'Need engine, turbo, grip at 3':L<=14?'Need 4 upgrades at level 4':L===15?'Need every upgrade maxed':'Need the Golden Turbo on the Gold R34';
+   S.result='LEVEL '+L+' LOST  +$'+prize+'  '+hintTxt;
+  }
+  store();
+ }
+ if(S.finished&&!S.ending&&performance.now()-S.doneAt>8000)toMenu();
+ if(!S.finished&&S.t>90){S.finished=true;S.et=S.t;S.win=false;S.doneAt=performance.now();S.paid=true;S.result='TIME OUT  tap to go back'}
+};
+
+// ---- Menu: level picker and golden turbo shop ----
+toMenu=function(){
+ mode='menu';sim=null;traffic=[];
+ const m=document.getElementById('menu');m.classList.remove('hide');
+ const c=CARS[save.car];
+ let html='<h1>DRAG RACING SIM</h1><h3>Cash: $'+save.cash+'  |  Car: '+c.n+'  |  Career level: '+Math.min(save.level,16)+(save.done?' (COMPLETE)':'')+'</h3>';
+ html+='<h3>Career race: level '+Math.min(save.level,16)+'</h3>';
+ html+='<button onclick="dist=402;startRace()">Race quarter mile</button><button onclick="dist=805;startRace()">Race half mile</button>';
+ if(save.level>1){html+=' <button onclick="save.level--;store();toMenu()">Replay easier level</button>'}
+ html+='<h3>Free roam</h3><button onclick="startFree()">Cruise the highway</button>';
+ html+='<h3>Garage</h3>';
+ CARS.forEach((car,i)=>{
+  if(car.gold&&!save.gold)return;
+  const own=save.owned.includes(i);
+  html+='<button onclick="buyCar('+i+')">'+car.n+(own?(save.car===i?' (driving)':' (owned, select)'):' - $'+car.price)+'</button>';
+ });
+ html+='<h3>Upgrades for '+c.n+'</h3>';
+ UPG.forEach(u=>{
+  if(u==='goldturbo'){
+   if(!save.gold||save.car!==GOLD_ID)return;
+   const l=lvl(u);
+   html+='<button onclick="buyUp(\'goldturbo\')" style="border-color:gold;color:gold">Golden Turbo '+(l>=1?'INSTALLED':'- $'+GOLD_TURBO_COST)+'</button>';
+   return;
+  }
+  const l=lvl(u),cost=500*(l+1)*(l+1);
+  html+='<button onclick="buyUp(\''+u+'\')">'+u+' L'+l+(l>=5?' MAX':' - $'+cost)+'</button>';
+ });
+ html+='<p>Slide up on the right to accelerate. Tap UP and DOWN to shift. Tap NOS for nitrous. Tap MENU to leave a race.</p>';
+ m.innerHTML=html;
+};
+buyUp=function(u){
+ if(u==='goldturbo'){
+  if(lvl(u)<1&&save.cash>=GOLD_TURBO_COST){save.cash-=GOLD_TURBO_COST;save.up[save.car+u]=1;store()}
+  toMenu();return;
+ }
+ const l=lvl(u),cost=500*(l+1)*(l+1);
+ if(l<5&&save.cash>=cost){save.cash-=cost;save.up[save.car+u]=l+1;store()}
+ toMenu();
+};
+
+// Golden Turbo gives a big boost, gold car stats are better by default
+const _oldStats=stats;
+stats=function(){
+ const s=_oldStats();
+ if(lvl('goldturbo')>=1){s.hp*=1.25;s.turbo=true}
+ return s;
+};
+
+// ---- Gold look: gold dash, gold gauges, neon interior lights ----
+const _oldDraw4=drawCockpit;
+drawCockpit=function(){
+ _oldDraw4();
+ if(save.car!==GOLD_ID||!sim)return;
+ const w=cv.width,h=cv.height,t=performance.now()/1000;
+ // gold trim along the top of the dash
+ g.strokeStyle='#ffd24a';g.lineWidth=4;
+ g.beginPath();g.moveTo(0,h*0.72);g.quadraticCurveTo(w/2,h*0.58,w,h*0.72);g.stroke();
+ // neon glow strips that slowly shift colour
+ const hue=(t*40)%360;
+ g.save();g.shadowColor='hsl('+hue+',100%,60%)';g.shadowBlur=25;
+ g.strokeStyle='hsl('+hue+',100%,60%)';g.lineWidth=5;
+ g.beginPath();g.moveTo(w*0.03,h*0.68);g.quadraticCurveTo(w/2,h*0.55,w*0.97,h*0.68);g.stroke();
+ g.beginPath();g.moveTo(w*0.02,h*0.98);g.lineTo(w*0.3,h*0.98);g.moveTo(w*0.7,h*0.98);g.lineTo(w*0.98,h*0.98);g.stroke();
+ g.restore();
+ // gold wash over the whole cockpit
+ g.fillStyle='rgba(255,200,60,0.07)';g.fillRect(0,h*0.55,w,h*0.45);
+};
+
+// ---- Thanks for playing ending screen ----
+const _oldDraw5=drawCockpit;
+drawCockpit=function(){
+ _oldDraw5();
+ if(!sim||!sim.ending)return;
+ sim.endT+=0.016;
+ const w=cv.width,h=cv.height;
+ const a=Math.min(0.92,sim.endT/3);
+ g.fillStyle='rgba(0,0,0,'+a+')';g.fillRect(0,0,w,h);
+ if(sim.endT<2)return;
+ g.textAlign='center';g.fillStyle='#ffd24a';g.font='bold '+(h*0.07)+'px monospace';
+ g.fillText('THANKS FOR PLAYING',w/2,h*0.2);
+ g.fillStyle='#fff';g.font=(h*0.035)+'px monospace';
+ const lines=[
+  'You started with a tired street coupe.',
+  'You tuned it, boosted it, and beat fifteen rivals.',
+  'Then you took down the secret sixteenth car',
+  'and won the golden R34 GTR for good.',
+  '',
+  'Final ET: '+sim.et.toFixed(2)+'s   Top speed: '+sim.trap.toFixed(0)+' mph',
+  'The Gold R34 and Golden Turbo are yours to keep.',
+  'Head to free roam and enjoy the open road.'
+ ];
+ lines.forEach((l,i)=>{if(sim.endT>2+i*0.6)g.fillText(l,w/2,h*0.32+i*h*0.06)});
+ if(sim.endT>8){g.fillStyle='#0f6';g.fillText('Tap anywhere to continue',w/2,h*0.88)}
+};
+// On the ending screen, only a tap after 8 seconds leaves
+cv.addEventListener('touchstart',e=>{
+ if(sim&&sim.ending&&sim.endT>8){e.preventDefault();toMenu()}
+},{passive:false});
+
+// ---- Engine rumble: replaces the droney single oscillator ----
+let rum=null;
+function buildRumble(){
+ if(rum||!AC)return;
+ rum={};
+ // low sub rumble
+ rum.sub=AC.createOscillator();rum.sub.type='sine';
+ rum.subG=AC.createGain();rum.subG.gain.value=0.0;
+ rum.sub.connect(rum.subG).connect(AC.destination);rum.sub.start();
+ // main body: square wave through a low pass for a chunky burble
+ rum.body=AC.createOscillator();rum.body.type='square';
+ rum.lp=AC.createBiquadFilter();rum.lp.type='lowpass';rum.lp.frequency.value=300;
+ rum.bodyG=AC.createGain();rum.bodyG.gain.value=0.0;
+ rum.body.connect(rum.lp).connect(rum.bodyG).connect(AC.destination);rum.body.start();
+ // cylinder pulse: a slow tremolo on the body gives the lumpy V8 burble
+ rum.lfo=AC.createOscillator();rum.lfo.type='sawtooth';
+ rum.lfoG=AC.createGain();rum.lfoG.gain.value=0.04;
+ rum.lfo.connect(rum.lfoG).connect(rum.bodyG.gain);rum.lfo.start();
+ // exhaust crackle noise
+ const nb=AC.createBuffer(1,AC.sampleRate*2,AC.sampleRate),nd=nb.getChannelData(0);
+ for(let i=0;i<nd.length;i++)nd[i]=Math.random()*2-1;
+ rum.noise=AC.createBufferSource();rum.noise.buffer=nb;rum.noise.loop=true;
+ rum.nf=AC.createBiquadFilter();rum.nf.type='bandpass';rum.nf.frequency.value=180;rum.nf.Q.value=0.8;
+ rum.nG=AC.createGain();rum.nG.gain.value=0;
+ rum.noise.connect(rum.nf).connect(rum.nG).connect(AC.destination);rum.noise.start();
+ // silence the old droning oscillator
+ if(typeof engG!=='undefined'&&engG)engG.gain.value=0;
+}
+soundUpdate=function(){
+ if(!AC||!sim)return;
+ buildRumble();
+ if(!rum)return;
+ const st=stats(),r=sim.rpm,th=sim.throttle;
+ // firing rate for a V8: rpm/60 * 4 pulses a second
+ const fire=r/60*4;
+ rum.sub.frequency.value=Math.max(24,fire*0.5);
+ rum.subG.gain.value=0.16+0.1*th;
+ rum.body.frequency.value=Math.max(30,fire*0.9);
+ rum.lp.frequency.value=220+r*0.12+th*350;
+ rum.bodyG.gain.value=0.06+0.08*th;
+ rum.lfo.frequency.value=Math.max(6,fire*0.25);
+ rum.nf.frequency.value=140+r*0.05;
+ rum.nG.gain.value=0.03+0.08*th;
+ if(typeof engG!=='undefined'&&engG)engG.gain.value=0;
+ // turbo whistle stays, quieter and higher
+ if(typeof whis!=='undefined'&&whis){
+  whis.frequency.value=1200+sim.boost*2800;
+  whisG.gain.value=st.turbo?Math.min(0.08,sim.boost*0.09):0;
+ }
+};
+toMenu();requestAnimationFrame(loop);
 </script>
 </body>
 </html>  
