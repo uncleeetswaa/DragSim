@@ -383,7 +383,106 @@ function loop(now){
  }
  requestAnimationFrame(loop);
 }
-toMenu();requestAnimationFrame(loop);
+// ===== PART 5: TOUCH CONTROLS =====
+const touch={thr:0,id:null,y0:0};
+const btn={up:null,dn:null,nos:null,menu:null};
+
+function layoutButtons(){
+ const w=cv.width,h=cv.height,r=Math.min(w,h)*0.075;
+ btn.up={x:w*0.1,y:h*0.45,r};
+ btn.dn={x:w*0.1,y:h*0.68,r};
+ btn.nos={x:w*0.1,y:h*0.22,r};
+ btn.menu={x:w*0.94,y:h*0.1,r:r*0.7};
+}
+layoutButtons();
+addEventListener('resize',layoutButtons);
+
+function hit(b,x,y){return Math.hypot(x-b.x,y-b.y)<b.r*1.2}
+
+// Keep the page from scrolling or zooming while you play
+cv.style.touchAction='none';
+document.body.style.touchAction='none';
+
+cv.addEventListener('touchstart',e=>{
+ e.preventDefault();
+ if(mode!=='race'&&mode!=='free')return;
+ initAudio();
+ for(const t of e.changedTouches){
+  const x=t.clientX,y=t.clientY;
+  if(hit(btn.up,x,y)){shift(1);continue}
+  if(hit(btn.dn,x,y)){shift(-1);continue}
+  if(hit(btn.nos,x,y)){useNos();continue}
+  if(hit(btn.menu,x,y)){toMenu();return}
+  // anything on the right half starts the throttle slide
+  if(x>cv.width*0.4&&touch.id===null){touch.id=t.identifier;touch.y0=y}
+ }
+},{passive:false});
+
+cv.addEventListener('touchmove',e=>{
+ e.preventDefault();
+ for(const t of e.changedTouches){
+  if(t.identifier===touch.id){
+   // slide up 40 percent of screen height = full throttle
+   const slide=(touch.y0-t.clientY)/(cv.height*0.4);
+   touch.thr=Math.max(0.05,Math.min(1,0.05+slide));
+  }
+ }
+},{passive:false});
+
+function endTouch(e){
+ for(const t of e.changedTouches){
+  if(t.identifier===touch.id){touch.id=null;touch.thr=0}
+ }
+}
+cv.addEventListener('touchend',endTouch);
+cv.addEventListener('touchcancel',endTouch);
+
+// Throttle input: feed the touch slide into the same keys the sim already reads
+setInterval(()=>{
+ if(touch.id!==null&&touch.thr>0.05)keys['w']=true;
+ else if(touch.id===null&&keys['w']&&!keys._kb)keys['w']=false;
+},30);
+const _oldKD=onkeydown;
+onkeydown=e=>{if(e.key==='w'||e.key===' ')keys._kb=true;_oldKD(e)};
+const _oldKU=onkeyup;
+onkeyup=e=>{if(e.key==='w'||e.key===' ')keys._kb=false;_oldKU(e)};
+
+// Draw the on-screen buttons and the throttle slider over the cockpit
+function drawTouchUI(){
+ if(mode!=='race'&&mode!=='free')return;
+ const w=cv.width,h=cv.height;
+ function round(b,label,col){
+  g.fillStyle='rgba(0,0,0,0.45)';g.beginPath();g.arc(b.x,b.y,b.r,0,7);g.fill();
+  g.strokeStyle=col;g.lineWidth=3;g.stroke();
+  g.fillStyle=col;g.font=(b.r*0.42)+'px monospace';g.textAlign='center';
+  g.fillText(label,b.x,b.y+b.r*0.15);
+ }
+ round(btn.nos,'NOS','#a4f');
+ round(btn.up,'UP','#0f6');
+ round(btn.dn,'DOWN','#fa0');
+ round(btn.menu,'MENU','#ccc');
+ // throttle bar on the right edge
+ const bx=w*0.95,by=h*0.25,bh=h*0.55;
+ g.fillStyle='rgba(0,0,0,0.45)';g.fillRect(bx-14,by,28,bh);
+ g.fillStyle=touch.thr>0.8?'#f33':'#0af';
+ g.fillRect(bx-14,by+bh*(1-touch.thr),28,bh*touch.thr);
+ g.strokeStyle='#fff';g.lineWidth=2;g.strokeRect(bx-14,by,28,bh);
+ g.fillStyle='#fff';g.font='12px monospace';g.textAlign='center';
+ g.fillText('SLIDE',bx,by-8);
+ if(touch.id===null&&mode==='race'&&sim&&sim.t<4){
+  g.font='22px monospace';g.fillText('Slide your thumb up on the right to accelerate',w/2,h*0.92);
+ }
+}
+
+// Hook the touch drawing into the existing loop without editing it
+const _oldDraw=drawCockpit;
+drawCockpit=function(){_oldDraw();drawTouchUI()};
+
+// Replace the keyboard hint at the bottom with a touch-friendly one
+const menuFix=document.createElement('style');
+menuFix.textContent='#menu button{font-size:20px;padding:16px 22px;margin:8px}#menu{font-size:18px;-webkit-user-select:none;user-select:none}';
+document.head.appendChild(menuFix);
+ toMenu();requestAnimationFrame(loop);
 </script>
 </body>
 </html>  
