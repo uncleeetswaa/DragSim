@@ -1,814 +1,681 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Street Racing Simulator</title>
-
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Street Drag Racer</title>
 <style>
-* { box-sizing:border-box; }
-
-body {
- margin:0;
- overflow:hidden;
- background:#080808;
- color:white;
- font-family:Arial,sans-serif;
-}
-
-canvas { display:block; }
-
-button {
- background:#222;
- color:white;
- border:1px solid #555;
- border-radius:10px;
- padding:14px;
- font-weight:bold;
- cursor:pointer;
-}
-
-button:active { background:#b52b22; }
-
-#menu {
- position:fixed;
- inset:0;
- background:linear-gradient(#101010,#242424);
- z-index:10;
- display:flex;
- flex-direction:column;
- align-items:center;
- justify-content:center;
- text-align:center;
- overflow-y:auto;
- padding:20px;
-}
-
-#menu h1 {
- font-size:36px;
- letter-spacing:4px;
-}
-
-#garage {
- display:none;
- width:100%;
- max-width:420px;
-}
-
-#carList {
- display:grid;
- grid-template-columns:1fr 1fr;
- gap:8px;
- margin:15px 0;
-}
-
-#carList button {
- font-size:11px;
-}
-
-#hud {
- position:fixed;
- inset:0;
- pointer-events:none;
-}
-
-#top {
- display:flex;
- justify-content:space-between;
- padding:18px;
- font-weight:bold;
- text-shadow:2px 2px black;
-}
-
-#speed {
- position:absolute;
- bottom:125px;
- left:50%;
- transform:translateX(-50%);
- font-size:48px;
- font-weight:bold;
- text-align:center;
-}
-
-#speed small {
- display:block;
- font-size:13px;
- color:#ccc;
-}
-
-#rpm {
- position:absolute;
- bottom:105px;
- left:50%;
- transform:translateX(-50%);
- width:210px;
- height:7px;
- background:#444;
-}
-
-#rpmBar {
- width:0%;
- height:100%;
- background:#e33;
-}
-
-#controls {
- position:fixed;
- bottom:15px;
- width:100%;
- display:flex;
- justify-content:space-between;
- padding:10px;
- gap:5px;
-}
-
-#controls button {
- min-width:55px;
- font-size:12px;
-}
-
-#accelerate {
- background:#a51e1e;
- min-width:80px !important;
- height:75px;
-}
-
-#nitrous { background:#075d9b; }
-
-#shift { background:#444; }
-
-#message {
- position:absolute;
- top:45%;
- width:100%;
- text-align:center;
- font-size:35px;
- font-weight:bold;
- text-shadow:2px 2px black;
-}
-
-#garageInfo {
- color:#aaa;
- font-size:13px;
-}
-
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
+html,body{width:100%;height:100%;overflow:hidden;background:#0a0a0a;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:#fff;touch-action:none}
+#garage,#upgrade,#result{position:fixed;inset:0;background:linear-gradient(180deg,#111 0%,#1a0505 50%,#0a0a0a 100%);overflow-y:auto;z-index:10;padding:12px;padding-bottom:80px}
+.header{text-align:center;padding:10px 0 16px;border-bottom:2px solid #c00}
+.header h1{font-size:22px;color:#f00;text-shadow:0 0 10px #f00;letter-spacing:1px}
+.header .money{font-size:18px;color:#0f0;margin-top:6px}
+.car-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0}
+.car-card{background:#1a1a1a;border:2px solid #333;border-radius:10px;padding:10px;text-align:center;transition:.15s}
+.car-card.owned{border-color:#0a0}
+.car-card.selected{border-color:#f00;box-shadow:0 0 12px #f00}
+.car-card h3{font-size:13px;margin-bottom:4px;color:#eee}
+.car-card .stats{font-size:11px;color:#aaa;line-height:1.4}
+.car-card button{margin-top:8px;width:100%;padding:8px;border:none;border-radius:6px;font-weight:700;font-size:13px}
+.btn-buy{background:#c00;color:#fff}
+.btn-select{background:#222;color:#0f0;border:1px solid #0f0!important}
+.btn-upgrade{background:#333;color:#ff0;border:1px solid #aa0!important}
+.btn-primary{background:linear-gradient(180deg,#e00,#900);color:#fff;border:none;border-radius:8px;padding:14px 20px;font-size:16px;font-weight:700;width:100%;margin-top:10px}
+.btn-primary:active{transform:scale(.97)}
+.btn-secondary{background:#222;color:#fff;border:1px solid #555;border-radius:8px;padding:12px;font-size:14px;width:100%;margin-top:8px}
+#upgrade .upgrade-list{margin:12px 0}
+.upgrade-item{background:#1a1a1a;border:1px solid #333;border-radius:8px;padding:12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center}
+.upgrade-item .info h4{font-size:14px;color:#eee}
+.upgrade-item .info p{font-size:11px;color:#888}
+.upgrade-item button{padding:8px 12px;background:#c00;color:#fff;border:none;border-radius:6px;font-weight:700}
+.upgrade-item .owned-tag{color:#0f0;font-size:12px}
+#race{position:fixed;inset:0;display:none;background:#000}
+#gameCanvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+#hud{position:absolute;top:0;left:0;right:0;padding:8px 12px;display:flex;justify-content:space-between;pointer-events:none;z-index:5;background:linear-gradient(180deg,rgba(0,0,0,.7),transparent)}
+.gauge{background:rgba(0,0,0,.65);border:1px solid #c00;border-radius:8px;padding:6px 10px;text-align:center;min-width:70px}
+.gauge .label{font-size:9px;color:#aaa;text-transform:uppercase}
+.gauge .value{font-size:18px;font-weight:700;color:#f00}
+.gauge .unit{font-size:10px;color:#888}
+#timer{font-size:22px;font-weight:700;color:#fff;text-shadow:0 0 8px #f00}
+#controls{position:absolute;bottom:0;left:0;right:0;padding:12px;display:flex;justify-content:space-around;align-items:flex-end;gap:8px;z-index:5;background:linear-gradient(0deg,rgba(0,0,0,.85),transparent);padding-bottom:max(12px,env(safe-area-inset-bottom))}
+.ctrl-btn{width:72px;height:72px;border-radius:50%;border:3px solid #c00;background:rgba(40,0,0,.85);color:#f00;font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center;flex-direction:column;touch-action:none}
+.ctrl-btn:active,.ctrl-btn.active{background:#c00;color:#fff;transform:scale(.94)}
+.ctrl-btn.nitro{border-color:#0af;color:#0af}
+.ctrl-btn.nitro.active{background:#0af;color:#000}
+.ctrl-btn.shift{border-color:#0f0;color:#0f0}
+.ctrl-btn.shift.active{background:#0f0;color:#000}
+#countdown{position:absolute;inset:0;display:none;align-items:center;justify-content:center;font-size:90px;font-weight:900;color:#f00;text-shadow:0 0 30px #f00;z-index:20;background:rgba(0,0,0,.4);pointer-events:none}
+#result{display:none;text-align:center;padding-top:60px}
+#result h2{font-size:28px;margin-bottom:12px}
+#result.win h2{color:#0f0}
+#result.lose h2{color:#f00}
+#result .reward{font-size:20px;color:#ff0;margin:16px 0}
+.gear-anim{position:absolute;right:10px;top:50%;transform:translateY(-50%);width:40px;height:120px;pointer-events:none;z-index:6;opacity:0;transition:opacity .15s}
+.gear-anim.show{opacity:1}
+.gear-hand{width:30px;height:50px;background:#333;border-radius:6px;margin:0 auto;position:relative;box-shadow:0 0 8px #000}
+.gear-hand::after{content:"";position:absolute;bottom:-8px;left:50%;transform:translateX(-50%);width:18px;height:18px;background:#555;border-radius:50%}
+.rpm-bar{position:absolute;bottom:100px;left:50%;transform:translateX(-50%);width:60%;height:8px;background:#222;border-radius:4px;overflow:hidden;z-index:5;border:1px solid #444}
+.rpm-fill{height:100%;width:0%;background:linear-gradient(90deg,#0f0,#ff0,#f00);transition:width .05s linear}
+.back-btn{position:absolute;top:12px;left:12px;background:rgba(0,0,0,.7);border:1px solid #666;color:#fff;padding:8px 14px;border-radius:6px;font-size:13px;z-index:15}
 </style>
 </head>
-
 <body>
-
-<div id="menu">
- <h1>STREET RACING</h1>
- <p>FIRST PERSON DRAG SIMULATOR</p>
-
- <button onclick="startGame()">START RACING</button>
- <br>
- <button onclick="openGarage()">GARAGE / CARS</button>
-
- <div id="garage">
-  <h2>YOUR GARAGE</h2>
-  <p id="selectedCar">Nissan Skyline R34 GT-R</p>
-  <div id="carList"></div>
-  <p id="garageInfo">ENGINE LEVEL: 1</p>
-  <button onclick="upgradeEngine()">UPGRADE ENGINE</button>
-  <br><br>
-  <button onclick="closeGarage()">BACK</button>
- </div>
+<div id="garage">
+  <div class="header">
+    <h1>STREET DRAG</h1>
+    <div class="money">$<span id="moneyDisplay">5000</span></div>
+  </div>
+  <div style="text-align:center;margin:10px 0;font-size:13px;color:#aaa">Select car then Race or Upgrade</div>
+  <div class="car-grid" id="carGrid"></div>
+  <button class="btn-primary" id="btnRace">START RACE</button>
+  <button class="btn-secondary" id="btnUpgradeMenu">UPGRADES</button>
 </div>
 
-<div id="hud">
- <div id="top">
-  <span id="gear">GEAR: 1</span>
-  <span id="nitroStatus">NITRO: 100%</span>
- </div>
-
- <div id="message">READY</div>
-
- <div id="speed">
-  0
-  <small>KM/H</small>
- </div>
-
- <div id="rpm">
-  <div id="rpmBar"></div>
- </div>
+<div id="upgrade" style="display:none">
+  <div class="header">
+    <h1>UPGRADES</h1>
+    <div class="money">$<span id="moneyDisplay2">5000</span></div>
+  </div>
+  <div id="upgradeCarName" style="text-align:center;margin:10px;font-size:16px;color:#f00"></div>
+  <div class="upgrade-list" id="upgradeList"></div>
+  <button class="btn-secondary" id="btnBackGarage">BACK TO GARAGE</button>
 </div>
 
-<div id="controls">
- <div>
-  <button id="left">LEFT</button>
-  <button id="right">RIGHT</button>
- </div>
-
- <div>
-  <button id="shift">SHIFT</button>
-  <button id="nitrous">N2O</button>
-  <button id="accelerate">ACCEL</button>
- </div>
+<div id="race">
+  <canvas id="gameCanvas"></canvas>
+  <div id="hud">
+    <div class="gauge"><div class="label">Speed</div><div class="value" id="speedVal">0</div><div class="unit">KM/H</div></div>
+    <div id="timer">0.00</div>
+    <div class="gauge"><div class="label">Gear</div><div class="value" id="gearVal">1</div></div>
+  </div>
+  <div class="rpm-bar"><div class="rpm-fill" id="rpmFill"></div></div>
+  <div class="gear-anim" id="gearAnim"><div class="gear-hand"></div></div>
+  <div id="countdown"></div>
+  <div id="controls">
+    <button class="ctrl-btn nitro" id="btnNitro">NOS</button>
+    <button class="ctrl-btn" id="btnAccel">GAS</button>
+    <button class="ctrl-btn shift" id="btnShift">SHIFT</button>
+  </div>
+  <button class="back-btn" id="btnQuitRace">QUIT</button>
 </div>
 
-<script type="module">
+<div id="result">
+  <h2 id="resultTitle">YOU WIN</h2>
+  <div class="reward" id="resultReward"></div>
+  <div style="font-size:14px;color:#aaa;margin:10px 0" id="resultTime"></div>
+  <button class="btn-primary" id="btnRaceAgain">RACE AGAIN</button>
+  <button class="btn-secondary" id="btnBackFromResult">GARAGE</button>
+</div>
 
-import * as THREE from
-'https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js';
+<script>
+(function(){
+"use strict";
 
-// =================================
-// GAME SETUP
-// =================================
-
-const scene = new THREE.Scene();
-
-scene.background = new THREE.Color(0x849db5);
-scene.fog = new THREE.Fog(0x849db5,40,180);
-
-const camera = new THREE.PerspectiveCamera(
- 75,
- innerWidth/innerHeight,
- 0.1,
- 400
-);
-
-camera.position.set(0,1.5,0);
-scene.add(camera);
-
-const renderer = new THREE.WebGLRenderer({
- antialias:true
-});
-
-renderer.setSize(innerWidth,innerHeight);
-renderer.setPixelRatio(Math.min(devicePixelRatio,2));
-renderer.outputColorSpace = THREE.SRGBColorSpace;
-
-document.body.prepend(renderer.domElement);
-
-// LIGHTING
-
-scene.add(new THREE.HemisphereLight(
- 0xffffff,0x444455,2
-));
-
-const sunlight = new THREE.DirectionalLight(
- 0xffffff,2
-);
-
-sunlight.position.set(10,20,10);
-scene.add(sunlight);
-
-// =================================
-// ROAD
-// =================================
-
-const road = new THREE.Mesh(
- new THREE.PlaneGeometry(16,400),
- new THREE.MeshStandardMaterial({
-  color:0x252525
- })
-);
-
-road.rotation.x=-Math.PI/2;
-road.position.z=-150;
-scene.add(road);
-
-const lines=[];
-
-for(let i=0;i<50;i++){
-
- const line=new THREE.Mesh(
-  new THREE.BoxGeometry(0.18,0.03,3),
-  new THREE.MeshBasicMaterial({
-   color:0xffffff
-  })
- );
-
- line.position.set(0,0.025,-i*7);
- scene.add(line);
- lines.push(line);
-}
-
-// ROAD BARRIERS
-
-for(const side of [-1,1]){
-
- const barrier=new THREE.Mesh(
-  new THREE.BoxGeometry(0.5,1,400),
-  new THREE.MeshStandardMaterial({
-   color:0x777777
-  })
- );
-
- barrier.position.set(side*8,0.5,-150);
- scene.add(barrier);
-}
-
-// ENVIRONMENT
-
-const buildings=[];
-
-for(let i=0;i<40;i++){
-
- for(const side of [-1,1]){
-
-  const h=4+Math.random()*15;
-
-  const building=new THREE.Mesh(
-   new THREE.BoxGeometry(5,h,7),
-   new THREE.MeshStandardMaterial({
-    color:0x454b55
-   })
-  );
-
-  building.position.set(
-   side*(14+Math.random()*8),
-   h/2,
-   -i*12-20
-  );
-
-  scene.add(building);
-  buildings.push(building);
- }
-}
-
-// =================================
-// COCKPIT
-// =================================
-
-const cockpit=new THREE.Group();
-camera.add(cockpit);
-
-const dashboard=new THREE.Mesh(
- new THREE.BoxGeometry(2.4,0.4,0.9),
- new THREE.MeshStandardMaterial({
-  color:0x101010
- })
-);
-
-dashboard.position.set(0,-0.62,-1.05);
-cockpit.add(dashboard);
-
-const bonnetMaterial=new THREE.MeshStandardMaterial({
- color:0x174b91,
- metalness:0.6,
- roughness:0.35
-});
-
-const bonnet=new THREE.Mesh(
- new THREE.BoxGeometry(1.8,0.12,2.5),
- bonnetMaterial
-);
-
-bonnet.position.set(0,-0.35,-2);
-cockpit.add(bonnet);
-
-// STEERING WHEEL
-
-const wheel=new THREE.Mesh(
- new THREE.TorusGeometry(0.32,0.045,12,32),
- new THREE.MeshStandardMaterial({
-  color:0x080808
- })
-);
-
-wheel.position.set(0,-0.48,-0.8);
-cockpit.add(wheel);
-
-// GEAR STICK
-
-const shifter=new THREE.Group();
-
-const stick=new THREE.Mesh(
- new THREE.CylinderGeometry(0.035,0.045,0.35,12),
- new THREE.MeshStandardMaterial({
-  color:0x999999,
-  metalness:0.8
- })
-);
-
-stick.position.set(0.8,-0.53,-0.85);
-shifter.add(stick);
-
-const knob=new THREE.Mesh(
- new THREE.SphereGeometry(0.085,16,16),
- new THREE.MeshStandardMaterial({
-  color:0x111111
- })
-);
-
-knob.position.set(0.8,-0.34,-0.85);
-shifter.add(knob);
-
-cockpit.add(shifter);
-
-// =================================
-// CAR COLLECTION
-// =================================
-
-const cars=[
-
- {name:"Nissan Skyline R31",color:0x222222,power:1.0,pitch:0.020},
- {name:"Nissan Skyline R32 GT-R",color:0x333333,power:1.1,pitch:0.023},
- {name:"Nissan Skyline R33 GT-R",color:0x555555,power:1.15,pitch:0.024},
- {name:"Nissan Skyline R34 GT-R",color:0x174b91,power:1.2,pitch:0.025},
- {name:"Nissan Skyline R35 GT-R",color:0x991111,power:1.3,pitch:0.020},
- {name:"Toyota Supra MK4",color:0xffcc00,power:1.2,pitch:0.024},
- {name:"Toyota Supra MK5",color:0xffffff,power:1.25,pitch:0.022},
- {name:"Subaru WRX STI",color:0x174b91,power:1.1,pitch:0.026},
- {name:"BMW M3",color:0x222222,power:1.2,pitch:0.019},
- {name:"Audi RS3",color:0x777777,power:1.15,pitch:0.020}
-
+const CARS = [
+  {id:0,name:"Nissan Skyline R31",hp:180,accel:2.8,top:210,price:0},
+  {id:1,name:"Nissan Skyline R32",hp:280,accel:3.4,top:250,price:8000},
+  {id:2,name:"Nissan Skyline R33",hp:300,accel:3.6,top:260,price:12000},
+  {id:3,name:"Nissan Skyline R34",hp:330,accel:3.9,top:270,price:18000},
+  {id:4,name:"Nissan GT-R R35",hp:480,accel:5.2,top:315,price:45000},
+  {id:5,name:"Toyota Supra MK4",hp:320,accel:3.8,top:265,price:15000},
+  {id:6,name:"Toyota Supra MK5",hp:382,accel:4.5,top:285,price:32000},
+  {id:7,name:"Subaru WRX STI",hp:310,accel:3.7,top:255,price:14000},
+  {id:8,name:"BMW M3",hp:450,accel:4.8,top:295,price:38000},
+  {id:9,name:"Audi RS3",hp:400,accel:4.6,top:280,price:30000}
 ];
 
-let selectedCarIndex=3;
-let engineUpgrade=1;
-let money=5000;
+const UPGRADES = {
+  engine:[{name:"Stage 1 Engine",mult:1.12,price:2500},{name:"Stage 2 Engine",mult:1.25,price:6000},{name:"Stage 3 Engine",mult:1.4,price:12000}],
+  turbo:[{name:"Stock Turbo",mult:1.08,price:2000},{name:"Big Turbo",mult:1.2,price:5500},{name:"Twin Turbo",mult:1.35,price:11000}],
+  gearbox:[{name:"Short Gears",mult:1.1,price:1800},{name:"Close Ratio",mult:1.22,price:4500},{name:"Racing Box",mult:1.35,price:9000}],
+  nitro:[{name:"50 Shot",power:1.3,dur:2.5,price:1500},{name:"100 Shot",power:1.55,dur:3.2,price:4000},{name:"200 Shot",power:1.9,dur:4.0,price:8500}]
+};
 
-function buildGarage(){
+let state = {
+  money:5000,
+  owned:[0],
+  selected:0,
+  upgrades:{},
+  highScore:0
+};
 
- const list=document.getElementById("carList");
- list.innerHTML="";
+function load(){
+  try{
+    const s=localStorage.getItem("sdr_v1");
+    if(s){const p=JSON.parse(s);state.money=p.money||5000;state.owned=p.owned||[0];state.selected=p.selected||0;state.upgrades=p.upgrades||{};state.highScore=p.highScore||0;}
+  }catch(e){}
+}
+function save(){
+  localStorage.setItem("sdr_v1",JSON.stringify(state));
+}
+load();
 
- cars.forEach((car,index)=>{
-
-  const button=document.createElement("button");
-
-  button.innerText=car.name;
-
-  button.style.borderColor=
-   index===selectedCarIndex?"#00aaff":"#555";
-
-  button.onclick=()=>selectCar(index);
-
-  list.appendChild(button);
-
- });
+function getCarStats(carId){
+  const base=CARS[carId];
+  const u=state.upgrades[carId]||{engine:-1,turbo:-1,gearbox:-1,nitro:-1};
+  let hp=base.hp, accel=base.accel, top=base.top;
+  if(u.engine>=0){const m=UPGRADES.engine[u.engine].mult;hp*=m;accel*=m*0.9;top*=1+(m-1)*0.6;}
+  if(u.turbo>=0){const m=UPGRADES.turbo[u.turbo].mult;hp*=m;accel*=m;top*=1+(m-1)*0.5;}
+  if(u.gearbox>=0){const m=UPGRADES.gearbox[u.gearbox].mult;accel*=m;}
+  return {hp:Math.round(hp),accel:+accel.toFixed(2),top:Math.round(top),nitro:u.nitro};
 }
 
-function openGarage(){
+// UI refs
+const garageEl=document.getElementById("garage");
+const upgradeEl=document.getElementById("upgrade");
+const raceEl=document.getElementById("race");
+const resultEl=document.getElementById("result");
+const carGrid=document.getElementById("carGrid");
+const moneyDisplay=document.getElementById("moneyDisplay");
+const moneyDisplay2=document.getElementById("moneyDisplay2");
+const canvas=document.getElementById("gameCanvas");
+const ctx=canvas.getContext("2d");
+const speedVal=document.getElementById("speedVal");
+const gearVal=document.getElementById("gearVal");
+const timerEl=document.getElementById("timer");
+const rpmFill=document.getElementById("rpmFill");
+const countdownEl=document.getElementById("countdown");
+const gearAnim=document.getElementById("gearAnim");
 
- document.getElementById("garage").style.display="block";
- buildGarage();
-
+function updateMoney(){
+  moneyDisplay.textContent=state.money.toLocaleString();
+  moneyDisplay2.textContent=state.money.toLocaleString();
 }
 
-function closeGarage(){
-
- document.getElementById("garage").style.display="none";
-
+function renderGarage(){
+  updateMoney();
+  carGrid.innerHTML="";
+  CARS.forEach((c,i)=>{
+    const owned=state.owned.includes(i);
+    const selected=state.selected===i;
+    const stats=getCarStats(i);
+    const card=document.createElement("div");
+    card.className="car-card"+(owned?" owned":"")+(selected?" selected":"");
+    card.innerHTML=`<h3>${c.name}</h3><div class="stats">HP ${stats.hp}<br>0-100 ${stats.accel}s<br>Top ${stats.top} km/h</div>`;
+    if(!owned){
+      const b=document.createElement("button");
+      b.className="btn-buy";
+      b.textContent=`BUY $${c.price.toLocaleString()}`;
+      b.addEventListener("click",()=>{
+        if(state.money>=c.price){
+          state.money-=c.price;
+          state.owned.push(i);
+          state.selected=i;
+          save();renderGarage();
+        }
+      });
+      card.appendChild(b);
+    }else{
+      const b=document.createElement("button");
+      b.className="btn-select";
+      b.textContent=selected?"SELECTED":"SELECT";
+      b.addEventListener("click",()=>{state.selected=i;save();renderGarage();});
+      card.appendChild(b);
+    }
+    carGrid.appendChild(card);
+  });
 }
 
-function selectCar(index){
+document.getElementById("btnUpgradeMenu").addEventListener("click",()=>{
+  if(!state.owned.includes(state.selected))return;
+  showUpgrade();
+});
+document.getElementById("btnBackGarage").addEventListener("click",()=>{
+  upgradeEl.style.display="none";
+  garageEl.style.display="block";
+  renderGarage();
+});
+document.getElementById("btnRace").addEventListener("click",()=>{
+  if(!state.owned.includes(state.selected))return;
+  startRace();
+});
+document.getElementById("btnRaceAgain").addEventListener("click",()=>{resultEl.style.display="none";startRace();});
+document.getElementById("btnBackFromResult").addEventListener("click",()=>{
+  resultEl.style.display="none";
+  raceEl.style.display="none";
+  garageEl.style.display="block";
+  renderGarage();
+});
+document.getElementById("btnQuitRace").addEventListener("click",()=>{
+  endRace(false,true);
+});
 
- selectedCarIndex=index;
-
- document.getElementById("selectedCar").innerText=
- "Selected: "+cars[index].name;
-
- bonnetMaterial.color.setHex(cars[index].color);
-
- buildGarage();
-
+function showUpgrade(){
+  garageEl.style.display="none";
+  upgradeEl.style.display="block";
+  updateMoney();
+  const car=CARS[state.selected];
+  document.getElementById("upgradeCarName").textContent=car.name;
+  const list=document.getElementById("upgradeList");
+  list.innerHTML="";
+  const u=state.upgrades[state.selected]||{engine:-1,turbo:-1,gearbox:-1,nitro:-1};
+  ["engine","turbo","gearbox","nitro"].forEach(type=>{
+    const arr=UPGRADES[type];
+    const cur=u[type];
+    const next=cur+1;
+    const item=document.createElement("div");
+    item.className="upgrade-item";
+    if(next>=arr.length){
+      item.innerHTML=`<div class="info"><h4>${type.toUpperCase()}</h4><p>MAXED</p></div><span class="owned-tag">OWNED</span>`;
+    }else{
+      const up=arr[next];
+      const price=up.price;
+      item.innerHTML=`<div class="info"><h4>${up.name}</h4><p>$${price.toLocaleString()}</p></div>`;
+      const b=document.createElement("button");
+      b.textContent="BUY";
+      b.addEventListener("click",()=>{
+        if(state.money>=price){
+          state.money-=price;
+          if(!state.upgrades[state.selected])state.upgrades[state.selected]={engine:-1,turbo:-1,gearbox:-1,nitro:-1};
+          state.upgrades[state.selected][type]=next;
+          save();showUpgrade();
+        }
+      });
+      item.appendChild(b);
+    }
+    list.appendChild(item);
+  });
 }
 
-function upgradeEngine(){
-
- if(money>=1000){
-
-  money-=1000;
-  engineUpgrade+=0.1;
-
-  document.getElementById("garageInfo").innerText=
-   "ENGINE LEVEL: "+engineUpgrade.toFixed(1)+
-   " | MONEY: $"+money;
-
- }else{
-
-  document.getElementById("garageInfo").innerText=
-   "NOT ENOUGH MONEY";
-
- }
-
+// ============ GAME ============
+let W,H,dpr;
+function resize(){
+  dpr=Math.min(window.devicePixelRatio||1,2);
+  W=window.innerWidth;
+  H=window.innerHeight;
+  canvas.width=W*dpr;
+  canvas.height=H*dpr;
+  canvas.style.width=W+"px";
+  canvas.style.height=H+"px";
+  ctx.setTransform(dpr,0,0,dpr,0,0);
 }
+window.addEventListener("resize",resize);
+resize();
 
-// =================================
-// GAME VARIABLES
-// =================================
+const GEAR_RATIOS=[0,3.2,2.1,1.5,1.15,0.9,0.75];
+const MAX_RPM=8500;
+const IDLE_RPM=900;
 
-let speed=0;
-let rpm=900;
-let gear=1;
+let game={
+  running:false,
+  countdown:3,
+  time:0,
+  player:{speed:0,rpm:IDLE_RPM,gear:1,throttle:false,nitro:false,nitroLeft:0,dist:0,shake:0},
+  opp:{speed:0,dist:0,accel:0},
+  finished:false,
+  won:false,
+  roadOffset:0,
+  lastTs:0
+};
 
-let acceleration=false;
-let nitrous=false;
-let steering=0;
-
-let nitroFuel=100;
-let started=false;
-
-const maxSpeed=320;
-
-const gearRatios=[0,65,110,165,220,270,320];
-
-// =================================
-// AUDIO
-// =================================
-
-let audio;
-let engine;
-let engineGain;
-let turbo;
-let turboGain;
+let audioCtx=null;
+let engineOsc=null,engineGain=null,turboOsc=null,nitroNoise=null;
 
 function initAudio(){
-
- if(audio){
-  audio.resume();
-  return;
- }
-
- audio=new AudioContext();
-
- engine=audio.createOscillator();
- engine.type="sawtooth";
-
- engineGain=audio.createGain();
- engineGain.gain.value=0.02;
-
- engine.connect(engineGain);
- engineGain.connect(audio.destination);
- engine.start();
-
- turbo=audio.createOscillator();
- turbo.type="sine";
-
- turboGain=audio.createGain();
- turboGain.gain.value=0;
-
- turbo.connect(turboGain);
- turboGain.connect(audio.destination);
- turbo.start();
-
+  if(audioCtx)return;
+  try{
+    audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+    engineOsc=audioCtx.createOscillator();
+    engineGain=audioCtx.createGain();
+    engineOsc.type="sawtooth";
+    engineOsc.frequency.value=80;
+    engineGain.gain.value=0;
+    engineOsc.connect(engineGain);
+    engineGain.connect(audioCtx.destination);
+    engineOsc.start();
+  }catch(e){}
 }
 
-function updateAudio(){
-
- if(!audio)return;
-
- const car=cars[selectedCarIndex];
-
- engine.frequency.setTargetAtTime(
-  35+rpm*car.pitch,
-  audio.currentTime,
-  0.06
- );
-
- engineGain.gain.setTargetAtTime(
-  acceleration?0.055:0.015,
-  audio.currentTime,
-  0.1
- );
-
- turbo.frequency.setTargetAtTime(
-  700+rpm*0.15,
-  audio.currentTime,
-  0.1
- );
-
- turboGain.gain.setTargetAtTime(
-  acceleration?0.012:0,
-  audio.currentTime,
-  0.1
- );
-
+function updateEngineSound(rpm,throttle){
+  if(!audioCtx||!engineOsc)return;
+  if(audioCtx.state==="suspended")audioCtx.resume();
+  const f=60+(rpm/MAX_RPM)*180;
+  engineOsc.frequency.setTargetAtTime(f,audioCtx.currentTime,0.05);
+  const vol=throttle?0.08+0.12*(rpm/MAX_RPM):0.03;
+  engineGain.gain.setTargetAtTime(vol,audioCtx.currentTime,0.08);
 }
 
 function playShiftSound(){
-
- if(!audio)return;
-
- const osc=audio.createOscillator();
- const gain=audio.createGain();
-
- osc.type="square";
- osc.frequency.value=120;
-
- gain.gain.value=0.04;
-
- osc.connect(gain);
- gain.connect(audio.destination);
-
- osc.start();
-
- gain.gain.exponentialRampToValueAtTime(
-  0.001,
-  audio.currentTime+0.12
- );
-
- osc.stop(audio.currentTime+0.13);
-
+  if(!audioCtx)return;
+  const o=audioCtx.createOscillator();
+  const g=audioCtx.createGain();
+  o.type="square";
+  o.frequency.value=120;
+  g.gain.value=0.1;
+  o.connect(g);g.connect(audioCtx.destination);
+  o.start();
+  g.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+0.08);
+  o.stop(audioCtx.currentTime+0.09);
 }
 
-// =================================
-// CONTROLS
-// =================================
-
-function startGame(){
-
- initAudio();
-
- document.getElementById("menu").style.display="none";
-
- started=true;
-
- gear=1;
- speed=0;
-
- document.getElementById("message").innerText="GO!";
-
- setTimeout(()=>{
-  document.getElementById("message").innerText="";
- },1200);
-
+function playNitroSound(on){
+  if(!audioCtx)return;
+  if(on){
+    try{
+      const bufferSize=2*audioCtx.sampleRate;
+      const buffer=audioCtx.createBuffer(1,bufferSize,audioCtx.sampleRate);
+      const data=buffer.getChannelData(0);
+      for(let i=0;i<bufferSize;i++)data[i]=(Math.random()*2-1)*0.3;
+      nitroNoise=audioCtx.createBufferSource();
+      nitroNoise.buffer=buffer;
+      nitroNoise.loop=true;
+      const g=audioCtx.createGain();
+      g.gain.value=0.15;
+      nitroNoise.connect(g);g.connect(audioCtx.destination);
+      nitroNoise.start();
+      nitroNoise._gain=g;
+    }catch(e){}
+  }else if(nitroNoise){
+    try{nitroNoise.stop();nitroNoise=null;}catch(e){}
+  }
 }
 
-function shiftGear(){
+function startRace(){
+  garageEl.style.display="none";
+  resultEl.style.display="none";
+  raceEl.style.display="block";
+  resize();
+  initAudio();
 
- if(!started)return;
+  const stats=getCarStats(state.selected);
+  const nitroLvl=(state.upgrades[state.selected]||{}).nitro;
+  const nitroData=nitroLvl>=0?UPGRADES.nitro[nitroLvl]:{power:1.2,dur:1.8};
 
- if(gear<6){
+  game={
+    running:false,
+    countdown:3,
+    time:0,
+    player:{
+      speed:0,rpm:IDLE_RPM,gear:1,throttle:false,nitro:false,nitroLeft:0,
+      dist:0,shake:0,stats:stats,nitroData:nitroData,shifting:false
+    },
+    opp:{
+      speed:0,dist:0,
+      targetAccel:2.8+Math.random()*1.4,
+      maxSpeed:230+Math.random()*50
+    },
+    finished:false,
+    won:false,
+    roadOffset:0,
+    lastTs:0,
+    finishDist:420
+  };
 
-  gear++;
+  speedVal.textContent="0";
+  gearVal.textContent="1";
+  timerEl.textContent="0.00";
+  rpmFill.style.width="10%";
+  countdownEl.style.display="flex";
+  countdownEl.textContent="3";
 
-  rpm=Math.max(1200,rpm-2000);
+  let cd=3;
+  const cdInt=setInterval(()=>{
+    cd--;
+    if(cd>0){countdownEl.textContent=cd;}
+    else if(cd===0){countdownEl.textContent="GO!";}
+    else{
+      clearInterval(cdInt);
+      countdownEl.style.display="none";
+      game.running=true;
+      game.lastTs=performance.now();
+      requestAnimationFrame(loop);
+    }
+  },1000);
+}
 
-  shifter.rotation.x=-0.35;
+function endRace(won,quit){
+  game.running=false;
+  game.finished=true;
+  playNitroSound(false);
+  if(engineGain)engineGain.gain.setTargetAtTime(0,audioCtx?audioCtx.currentTime:0,0.1);
 
+  if(quit){
+    raceEl.style.display="none";
+    garageEl.style.display="block";
+    renderGarage();
+    return;
+  }
+
+  const reward=won?Math.round(800+game.time*40+game.player.stats.hp*1.5):Math.round(120+Math.random()*80);
+  if(won)state.money+=reward;
+  save();
+
+  resultEl.className=won?"win":"lose";
+  resultEl.style.display="block";
+  document.getElementById("resultTitle").textContent=won?"YOU WIN!":"YOU LOSE";
+  document.getElementById("resultReward").textContent=won?`+$${reward.toLocaleString()}`:`+$${reward} consolation`;
+  document.getElementById("resultTime").textContent=`Time: ${game.time.toFixed(2)}s  |  Speed: ${Math.round(game.player.speed)} km/h`;
+}
+
+// Controls
+const btnAccel=document.getElementById("btnAccel");
+const btnShift=document.getElementById("btnShift");
+const btnNitro=document.getElementById("btnNitro");
+
+function bindHold(btn,on,off){
+  const start=e=>{e.preventDefault();on();btn.classList.add("active");};
+  const end=e=>{e.preventDefault();off();btn.classList.remove("active");};
+  btn.addEventListener("touchstart",start,{passive:false});
+  btn.addEventListener("touchend",end,{passive:false});
+  btn.addEventListener("touchcancel",end,{passive:false});
+  btn.addEventListener("mousedown",start);
+  btn.addEventListener("mouseup",end);
+  btn.addEventListener("mouseleave",end);
+}
+
+bindHold(btnAccel,()=>{game.player.throttle=true;},()=>{game.player.throttle=false;});
+btnShift.addEventListener("touchstart",e=>{e.preventDefault();doShift();},{passive:false});
+btnShift.addEventListener("mousedown",e=>{e.preventDefault();doShift();});
+bindHold(btnNitro,()=>{
+  if(game.player.nitroLeft<=0&&game.player.stats.nitro>=0){
+    game.player.nitroLeft=game.player.nitroData.dur;
+  }
+  if(game.player.nitroLeft>0){game.player.nitro=true;playNitroSound(true);}
+},()=>{game.player.nitro=false;playNitroSound(false);});
+
+function doShift(){
+  if(!game.running||game.player.gear>=6||game.player.shifting)return;
+  game.player.shifting=true;
+  game.player.gear++;
+  game.player.rpm=Math.max(IDLE_RPM,game.player.rpm*0.55);
+  gearVal.textContent=game.player.gear;
   playShiftSound();
-
-  setTimeout(()=>{
-   shifter.rotation.x=0;
-  },180);
-
-  document.getElementById("gear").innerText=
-   "GEAR: "+gear;
-
- }
-
+  gearAnim.classList.add("show");
+  setTimeout(()=>{gearAnim.classList.remove("show");game.player.shifting=false;},280);
 }
 
-function bindHold(id,callback){
-
- const element=document.getElementById(id);
-
- element.addEventListener("pointerdown",e=>{
-  e.preventDefault();
-  callback(true);
- });
-
- ["pointerup","pointercancel","pointerleave"].forEach(event=>{
-  element.addEventListener(event,()=>{
-   callback(false);
-  });
- });
-
+function loop(ts){
+  if(!game.running)return;
+  const dt=Math.min((ts-game.lastTs)/1000,0.05);
+  game.lastTs=ts;
+  update(dt);
+  render();
+  requestAnimationFrame(loop);
 }
 
-bindHold("accelerate",v=>acceleration=v);
-bindHold("left",v=>steering=v?-1:0);
-bindHold("right",v=>steering=v?1:0);
-bindHold("nitrous",v=>nitrous=v);
+function update(dt){
+  const p=game.player;
+  const o=game.opp;
+  game.time+=dt;
 
-document.getElementById("shift").onclick=shiftGear;
-
-// =================================
-// GAME LOOP
-// =================================
-
-let last=performance.now();
-let elapsed=0;
-
-function animate(now){
-
- requestAnimationFrame(animate);
-
- const dt=Math.min((now-last)/1000,0.05);
- last=now;
-
- elapsed+=dt;
-
- if(started){
-
-  const car=cars[selectedCarIndex];
-
-  if(acceleration){
-
-   speed+=15*car.power*engineUpgrade*dt;
-
+  // RPM & speed
+  const ratio=GEAR_RATIOS[p.gear];
+  const targetRpm=p.throttle?Math.min(MAX_RPM,IDLE_RPM+p.speed*ratio*28):Math.max(IDLE_RPM,p.rpm-dt*1800);
+  if(p.throttle){
+    const power=p.stats.hp/320;
+    const gearEff=1/(0.7+ratio*0.4);
+    let accelForce=(power*gearEff*2.8)*(1-p.speed/p.stats.top);
+    if(p.nitro&&p.nitroLeft>0){
+      accelForce*=p.nitroData.power;
+      p.nitroLeft-=dt;
+      if(p.nitroLeft<=0){p.nitro=false;playNitroSound(false);}
+    }
+    p.speed+=accelForce*dt*18;
+    p.rpm=Math.min(MAX_RPM,p.rpm+dt*2200*gearEff);
+    p.shake=Math.min(8,p.shake+dt*20);
   }else{
+    p.speed=Math.max(0,p.speed-dt*12);
+    p.rpm=Math.max(IDLE_RPM,p.rpm-dt*1600);
+    p.shake=Math.max(0,p.shake-dt*15);
+  }
+  if(p.speed>p.stats.top)p.speed=p.stats.top;
+  if(p.rpm>MAX_RPM*0.98&&p.throttle)p.speed*=0.998;
 
-   speed-=10*dt;
+  p.dist+=p.speed*dt*0.28;
+  game.roadOffset+=p.speed*dt*1.8;
 
+  // Opponent
+  if(o.speed<o.maxSpeed)o.speed+=o.targetAccel*dt*9;
+  o.dist+=o.speed*dt*0.28;
+
+  // Finish
+  if(p.dist>=game.finishDist||o.dist>=game.finishDist){
+    const won=p.dist>=o.dist;
+    endRace(won,false);
+    return;
   }
 
-  if(nitrous && nitroFuel>0){
-
-   speed+=35*dt;
-   nitroFuel-=22*dt;
-
-  }else{
-
-   nitroFuel+=3*dt;
-
-  }
-
-  nitroFuel=Math.max(0,Math.min(100,nitroFuel));
-
-  const gearLimit=gearRatios[gear];
-
-  speed=Math.max(0,Math.min(maxSpeed,speed));
-
-  rpm=900+(speed/Math.max(1,gearLimit))*6500;
-
-  rpm=Math.min(9000,rpm);
-
-  // COCKPIT MOVEMENT
-
-  camera.rotation.z+=
-   (-steering*0.035-camera.rotation.z)*dt*5;
-
-  camera.position.x+=steering*speed*0.0005*dt;
-  camera.position.x*=0.99;
-
-  const tilt=acceleration?-0.09:0;
-
-  camera.rotation.x+=
-   (tilt-camera.rotation.x)*dt*2;
-
-  camera.position.y=
-   1.5+Math.sin(elapsed*speed*0.025)*0.006;
-
-  wheel.rotation.z=-steering*0.45;
-
-  // ROAD MOVEMENT
-
-  const movement=speed*dt*0.09;
-
-  lines.forEach(line=>{
-
-   line.position.z+=movement;
-
-   if(line.position.z>5){
-    line.position.z-=350;
-   }
-
-  });
-
-  buildings.forEach(building=>{
-
-   building.position.z+=movement;
-
-   if(building.position.z>15){
-    building.position.z-=480;
-   }
-
-  });
-
-  // HUD
-
-  document.getElementById("speed").innerHTML=
-   Math.round(speed)+"<small>KM/H</small>";
-
-  document.getElementById("gear").innerText=
-   "GEAR: "+gear;
-
-  document.getElementById("nitroStatus").innerText=
-   "NITRO: "+Math.round(nitroFuel)+"%";
-
-  document.getElementById("rpmBar").style.width=
-   (rpm/9000*100)+"%";
-
-  updateAudio();
-
- }
-
- renderer.render(scene,camera);
-
+  updateEngineSound(p.rpm,p.throttle);
+  speedVal.textContent=Math.round(p.speed);
+  rpmFill.style.width=Math.min(100,(p.rpm/MAX_RPM)*100)+"%";
+  timerEl.textContent=game.time.toFixed(2);
 }
 
-requestAnimationFrame(animate);
+function render(){
+  const p=game.player;
+  const shakeX=(Math.random()-0.5)*p.shake;
+  const shakeY=(Math.random()-0.5)*p.shake*0.6;
 
-// =================================
-// RESIZE
-// =================================
+  ctx.clearRect(0,0,W,H);
 
-window.addEventListener("resize",()=>{
+  // Sky
+  const grad=ctx.createLinearGradient(0,0,0,H*0.45);
+  grad.addColorStop(0,"#0a0a18");
+  grad.addColorStop(1,"#1a0a0a");
+  ctx.fillStyle=grad;
+  ctx.fillRect(0,0,W,H*0.45);
 
- camera.aspect=innerWidth/innerHeight;
- camera.updateProjectionMatrix();
+  // Horizon glow
+  ctx.fillStyle="rgba(180,20,20,0.15)";
+  ctx.fillRect(0,H*0.38,W,H*0.1);
 
- renderer.setSize(innerWidth,innerHeight);
+  // Road
+  const horizon=H*0.42;
+  const roadW=W*1.6;
+  ctx.save();
+  ctx.translate(shakeX,shakeY);
 
-});
+  // Road surface
+  ctx.beginPath();
+  ctx.moveTo(W/2-roadW*0.05,horizon);
+  ctx.lineTo(W/2+roadW*0.05,horizon);
+  ctx.lineTo(W+80,H);
+  ctx.lineTo(-80,H);
+  ctx.closePath();
+  ctx.fillStyle="#111";
+  ctx.fill();
 
+  // Road edges
+  ctx.strokeStyle="#c00";
+  ctx.lineWidth=3;
+  ctx.beginPath();
+  ctx.moveTo(W/2-roadW*0.05,horizon);
+  ctx.lineTo(-40,H);
+  ctx.moveTo(W/2+roadW*0.05,horizon);
+  ctx.lineTo(W+40,H);
+  ctx.stroke();
+
+  // Center lines (moving)
+  const seg=40;
+  const off=game.roadOffset%seg;
+  ctx.strokeStyle="#ccc";
+  ctx.lineWidth=4;
+  ctx.setLineDash([18,22]);
+  ctx.lineDashOffset=-off*2;
+  ctx.beginPath();
+  ctx.moveTo(W/2,horizon);
+  ctx.lineTo(W/2,H);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Side markers
+  for(let i=0;i<12;i++){
+    const t=(i*seg+off)%(seg*8)/ (seg*8);
+    const y=horizon+(H-horizon)*Math.pow(t,1.4);
+    const scale=t;
+    const xL=W/2-(roadW*0.05+scale*(W*0.55));
+    const xR=W/2+(roadW*0.05+scale*(W*0.55));
+    ctx.fillStyle=i%2===0?"#f00":"#fff";
+    ctx.fillRect(xL-4,y,8,6*scale+2);
+    ctx.fillRect(xR-4,y,8,6*scale+2);
+  }
+
+  // Opponent car (simple 3D-ish)
+  const rel=game.opp.dist-p.dist;
+  if(rel>-30&&rel<80){
+    const t=Math.max(0.05,0.35+rel*0.006);
+    const oy=horizon+(H-horizon)*Math.pow(Math.min(1,t),1.3);
+    const ox=W/2+55*t;
+    const scale=0.4+t*1.1;
+    drawCar(ox,oy,scale*28,scale*14,"#222",true);
+  }
+
+  // Player hood / dashboard hint
+  ctx.fillStyle="#1a1a1a";
+  ctx.beginPath();
+  ctx.moveTo(0,H*0.78);
+  ctx.quadraticCurveTo(W*0.5,H*0.72,W,H*0.78);
+  ctx.lineTo(W,H);
+  ctx.lineTo(0,H);
+  ctx.closePath();
+  ctx.fill();
+
+  // Dashboard line
+  ctx.strokeStyle="#c00";
+  ctx.lineWidth=2;
+  ctx.beginPath();
+  ctx.moveTo(0,H*0.78);
+  ctx.quadraticCurveTo(W*0.5,H*0.72,W,H*0.78);
+  ctx.stroke();
+
+  // Steering wheel hint
+  ctx.strokeStyle="#333";
+  ctx.lineWidth=6;
+  ctx.beginPath();
+  ctx.arc(W/2,H*0.95,W*0.18,Math.PI*1.1,Math.PI*1.9);
+  ctx.stroke();
+
+  ctx.restore();
+
+  // Finish line indicator
+  if(p.dist>game.finishDist*0.7){
+    const prog=(p.dist/game.finishDist);
+    ctx.fillStyle="rgba(255,0,0,0.3)";
+    ctx.fillRect(0,horizon-4,W*(prog),6);
+  }
+}
+
+function drawCar(x,y,w,h,col,isOpp){
+  ctx.fillStyle=col;
+  ctx.fillRect(x-w/2,y-h,w,h);
+  ctx.fillStyle="#111";
+  ctx.fillRect(x-w*0.35,y-h*0.85,w*0.7,h*0.35);
+  ctx.fillStyle="#f00";
+  ctx.fillRect(x-w/2,y-h*0.15,w,3);
+  if(isOpp){
+    ctx.fillStyle="#ff0";
+    ctx.fillRect(x-w*0.3,y-h*0.5,w*0.15,h*0.12);
+    ctx.fillRect(x+w*0.15,y-h*0.5,w*0.15,h*0.12);
+  }
+}
+
+// Prevent scroll/zoom
+document.addEventListener("touchmove",e=>{e.preventDefault();},{passive:false});
+document.addEventListener("gesturestart",e=>e.preventDefault());
+
+renderGarage();
+})();
 </script>
 </body>
 </html>
