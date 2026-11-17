@@ -17,25 +17,42 @@ canvas{display:block;width:100vw;height:100vh;touch-action:none}
 <canvas id="c"></canvas>
 <div id="menu"></div>
 <script>
-// ===== BLOCK 1: DATA, SAVE, STATS =====
+// ===== BLOCK 1: DATA, POWER RATING, SAVE, STATS =====
 const cv=document.getElementById('c'),g=cv.getContext('2d');
 function rs(){cv.width=innerWidth;cv.height=innerHeight}rs();
 
+// pr = base power rating. It climbs up the ladder.
 const CARS=[
- {n:'Nizzan Silvana',mass:1250,hp:230,grip:1.00,gears:[3.6,2.2,1.5,1.1,0.85],price:0,snd:0,drv:'RWD'},
- {n:'Hold On GTS',mass:1700,hp:400,grip:0.95,gears:[3.2,2.0,1.4,1.0,0.8],price:18000,snd:1,drv:'RWD V8'},
- {n:'Rotary Rocket',mass:1300,hp:340,grip:1.08,gears:[3.8,2.3,1.6,1.15,0.9],price:32000,snd:2,drv:'RWD rotary'},
- {n:'Toyoda Supreme',mass:1500,hp:520,grip:1.15,gears:[3.5,2.15,1.5,1.1,0.85],price:55000,snd:3,drv:'RWD turbo six'},
- {n:'BMW-ish Beamer',mass:1550,hp:650,grip:1.22,gears:[3.4,2.1,1.5,1.1,0.85],price:90000,snd:3,drv:'RWD twin turbo'},
- {n:'Golden Godzilla',mass:1450,hp:760,grip:1.30,gears:[3.5,2.2,1.55,1.15,0.88],price:0,snd:4,drv:'AWD gold',gold:true}
+ {n:'Nizzan Silvana',mass:1250,hp:230,grip:1.00,gears:[3.6,2.2,1.5,1.1,0.85],price:0,snd:0,pr:200,drv:'RWD'},
+ {n:'Hold On GTS',mass:1700,hp:400,grip:0.95,gears:[3.2,2.0,1.4,1.0,0.8],price:18000,snd:1,pr:290,drv:'RWD V8'},
+ {n:'Rotary Rocket',mass:1300,hp:340,grip:1.08,gears:[3.8,2.3,1.6,1.15,0.9],price:32000,snd:2,pr:380,drv:'RWD rotary'},
+ {n:'BMW-ish Beamer',mass:1550,hp:520,grip:1.15,gears:[3.4,2.1,1.5,1.1,0.85],price:55000,snd:3,pr:480,drv:'RWD twin turbo'},
+ {n:'Toyoda Supreme',mass:1500,hp:650,grip:1.22,gears:[3.5,2.15,1.5,1.1,0.85],price:90000,snd:4,pr:590,drv:'RWD turbo six'},
+ {n:'Golden Godzilla',mass:1450,hp:760,grip:1.30,gears:[3.5,2.2,1.55,1.15,0.88],price:0,snd:4,pr:700,drv:'AWD gold',gold:true}
 ];
 const GOLD_ID=5;
-const UPG=['engine','turbo','tires','suspension','transmission','nitrous','exhaust','grip','goldturbo'];
+const UPG=['turbo','engine','nitrous','tires','grip','exhaust','suspension','transmission','goldturbo'];
+const MAXL=5;
+// PR added per upgrade level. Turbo gives the most, then engine, then nitrous, then tires and grip.
+const PR_PER={turbo:14,engine:11,nitrous:8,tires:6,grip:5,exhaust:3,suspension:3,transmission:3,goldturbo:0};
 const GOLD_TURBO_COST=120000;
 
-let save=JSON.parse(localStorage.getItem('drsim4')||'null')||{cash:10000,car:0,owned:[0],up:{},level:1,gold:false,done:false};
-function store(){localStorage.setItem('drsim4',JSON.stringify(save))}
+let save=JSON.parse(localStorage.getItem('drsim5')||'null')||{cash:10000,car:0,owned:[0],up:{},level:1,gold:false,done:false};
+function store(){localStorage.setItem('drsim5',JSON.stringify(save))}
 function lvl(k){return save.up[save.car+k]||0}
+
+// Total power rating of the car you are driving
+function myPR(){
+ let p=CARS[save.car].pr;
+ UPG.forEach(u=>{p+=PR_PER[u]*lvl(u)});
+ if(lvl('goldturbo')>=1)p+=60;
+ return p;
+}
+// Rival power rating for each level. Starts below your starter car and climbs gradually.
+function rivalPR(L){
+ if(L>=16)return 800;
+ return Math.round(170+(L-1)*37);
+}
 
 function stats(){
  const c=CARS[save.car];
@@ -61,7 +78,6 @@ const btn={up:null,dn:null,nos:null,menu:null,cam:null};
 function layoutButtons(){
  const w=cv.width,h=cv.height,portrait=h>w;
  if(portrait){
-  // upright phone: buttons stacked down the left edge, VIEW and MENU along the top
   const r=w*0.085;
   btn.nos={x:w*0.12,y:h*0.62,r};
   btn.up={x:w*0.12,y:h*0.74,r};
@@ -282,31 +298,7 @@ function step(dt){
  S.pitch+=(tgt-S.pitch)*Math.min(1,dt*3.5);
 }
 // BLOCK 3 continues below...
-// ===== BLOCK 3: CAREER, RIVALS, RACE FLOW =====
-
-const BLOCKS=[[1,3],[4,6],[7,9],[10,12],[13,15]];
-function carForLevel(L){
- if(L>=16)return GOLD_ID;
- for(let i=0;i<BLOCKS.length;i++)if(L>=BLOCKS[i][0]&&L<=BLOCKS[i][1])return i;
- return 0;
-}
-function posInBlock(L){return L-BLOCKS[carForLevel(L)][0]}
-function upCount(minLvl){let n=0;UPG.forEach(u=>{if(u!=='goldturbo'&&lvl(u)>=minLvl)n++});return n}
-
-function meetsGate(L){
- if(carForLevel(L)!==save.car)return false;
- if(L===16)return lvl('goldturbo')>=1;
- if(L===15)return upCount(5)>=8;
- const p=posInBlock(L);
- if(p===0)return true;
- if(p===1)return lvl('engine')>=1+Math.floor(L/6)&&lvl('turbo')>=1+Math.floor(L/6);
- const k=2+Math.floor(L/5);
- return lvl('engine')>=k&&lvl('turbo')>=k&&lvl('grip')>=2+Math.floor(L/6)&&upCount(2+Math.floor(L/6))>=Math.min(8,3+Math.floor(L/3));
-}
-function surplus(L){
- let s=0;UPG.forEach(u=>{if(u!=='goldturbo')s+=lvl(u)});
- return s-Math.min(40,L*2);
-}
+// ===== BLOCK 3: POWER RATING CAREER, RIVALS, RACE FLOW =====
 
 // Rival cars: a different make, colour and shape for every level
 const RIVALS=[
@@ -329,30 +321,40 @@ const RIVALS=[
 ];
 function rival(){return RIVALS[Math.min(RIVALS.length-1,Math.max(0,save.level-1))]}
 
+// Can you take this level in the car you are driving?
+function canWin(L){
+ if(L===16)return save.car===GOLD_ID&&lvl('goldturbo')>=1&&myPR()>rivalPR(L);
+ return myPR()>rivalPR(L);
+}
+// How far ahead you are, in PR points
+function lead(L){return myPR()-rivalPR(L)}
+
 function stepOpp(dt){
  const S=sim,o=S.opp;
  if(!o||!S.started)return;
- const L=save.level,ok=meetsGate(L);
+ const L=save.level,ok=canWin(L),d=lead(L);
  const pace=Math.max(S.v,6+S.t*7);
  let k;
  if(!ok)k=1.03;
- else k=Math.max(0.90,0.985-Math.min(0.08,surplus(L)*0.004));
+ else k=Math.max(0.90,0.985-Math.min(0.08,Math.max(0,d-8)*0.0015));
  o.v+=(pace*k-o.v)*Math.min(1,dt*2.2);
  o.x+=o.v*dt;
  if(ok){
   const gapBehind=0.6+Math.min(2.5,S.v*0.04);
   if(o.x>S.x-gapBehind)o.x=S.x-gapBehind;
  }else{
-  const lead=1+Math.min(4,S.v*0.05);
-  if(o.x<S.x+lead)o.x=S.x+lead;
+  const ahead=1+Math.min(4,S.v*0.05);
+  if(o.x<S.x+ahead)o.x=S.x+ahead;
  }
  if(o.x<0)o.x=0;
 }
 
-function prizeFor(L,half){return Math.round((half?1.7:1)*(900+L*420))}
+// Win prize climbs only a little per level. A loss is always $200.
+function prizeFor(L,half){return Math.round((half?1.4:1)*(1200+L*120))}
 function upCost(u){
  const l=lvl(u),c=CARS[save.car];
- return Math.round((700+c.price*0.035)*Math.pow(1.85,l)/50)*50;
+ const base={turbo:1400,engine:1100,nitrous:900,tires:600,grip:550,exhaust:450,suspension:450,transmission:450}[u]||600;
+ return Math.round((base+c.price*0.03)*Math.pow(1.8,l)/50)*50;
 }
 
 function startRace(){
@@ -399,12 +401,12 @@ function raceFlow(dt){
  }
  S.t+=dt;
  stepOpp(dt);
- if(S.x>=dist){S.finished=true;S.et=S.t;S.trap=S.v*2.237;S.win=S.opp.x<dist&&meetsGate(L);S.doneAt=performance.now()}
+ if(S.x>=dist){S.finished=true;S.et=S.t;S.trap=S.v*2.237;S.win=S.opp.x<dist&&canWin(L);S.doneAt=performance.now()}
  else if(S.opp.x>=dist){S.finished=true;S.et=S.t;S.trap=S.v*2.237;S.win=false;S.doneAt=performance.now()}
  if(S.finished&&!S.paid){
   S.paid=true;
   const half=dist>500,full=prizeFor(L,half),rt=S.react===null?1:S.react;
-  const bonus=rt<0.2?500:rt<0.35?200:0;
+  const bonus=rt<0.2?300:rt<0.35?120:0;
   if(S.win){
    const prize=full+bonus;save.cash+=prize;
    S.result='LEVEL '+L+' WON  +$'+prize+'  ET '+S.et.toFixed(2)+'s  RT '+rt.toFixed(3);
@@ -412,9 +414,10 @@ function raceFlow(dt){
    if(L===15){save.gold=true;if(!save.owned.includes(GOLD_ID))save.owned.push(GOLD_ID);S.result='LEVEL 15 WON! SECRET LEVEL 16 UNLOCKED'}
    if(L===16){save.done=true;S.ending=true;S.endT=0}
   }else{
-   const prize=Math.round(full*0.18);save.cash+=prize;
-   const hint=carForLevel(L)!==save.car?'Wrong car for this level':L===16?'Need the Golden Turbo':L===15?'Need every upgrade maxed':'Need more upgrades on this car';
-   S.result='LEVEL '+L+' LOST  +$'+prize+'  '+hint;
+   save.cash+=200;
+   const need=rivalPR(L)+1-myPR();
+   const hint=L===16&&(save.car!==GOLD_ID||lvl('goldturbo')<1)?'Need the Golden Godzilla with the Golden Turbo':'Need '+Math.max(1,need)+' more PR';
+   S.result='LEVEL '+L+' LOST  +$200  '+hint;
   }
   store();
  }
@@ -423,6 +426,7 @@ function raceFlow(dt){
 // ===== BLOCK 4: GRAPHICS, CAMERAS, TOUCH, MENU, DEV CODE, LOOP =====
 
 function horizonY(){return cv.height*0.42+sim.pitch*cv.height*0.05}
+let smoke=[];
 
 // ---- Sky, sun, ground, road ----
 function drawWorld(){
@@ -438,14 +442,16 @@ function drawWorld(){
  g.lineTo(w,hz);g.fill();
  const gr=g.createLinearGradient(0,hz,0,h);gr.addColorStop(0,'#2b2a2e');gr.addColorStop(1,'#151418');
  g.fillStyle=gr;g.fillRect(0,hz,w,h-hz);
- // road: two lanes with warm light near the horizon
+ // road: two lanes
  g.fillStyle='#3a3a40';g.beginPath();
  g.moveTo(w*0.485,hz);g.lineTo(w*0.515,hz);g.lineTo(w*0.98,h);g.lineTo(w*0.02,h);g.fill();
- const rg=g.createLinearGradient(0,hz,0,hz+h*0.2);rg.addColorStop(0,'rgba(255,170,90,0.45)');rg.addColorStop(1,'rgba(255,170,90,0)');
+ // wet-look sheen: warm reflection of the sun running down the road
+ const rg=g.createLinearGradient(0,hz,0,h);
+ rg.addColorStop(0,'rgba(255,190,110,0.55)');rg.addColorStop(0.5,'rgba(255,160,90,0.18)');rg.addColorStop(1,'rgba(255,160,90,0.04)');
  g.fillStyle=rg;g.beginPath();g.moveTo(w*0.485,hz);g.lineTo(w*0.515,hz);g.lineTo(w*0.98,h);g.lineTo(w*0.02,h);g.fill();
  g.strokeStyle='#ddd';g.lineWidth=3;
  g.beginPath();g.moveTo(w*0.485,hz);g.lineTo(w*0.02,h);g.moveTo(w*0.515,hz);g.lineTo(w*0.98,h);g.stroke();
- // centre dashes between the two lanes scroll to give speed
+ // centre dashes scroll to give speed
  g.strokeStyle='#e8e8e8';
  for(let i=0;i<16;i++){
   const z=((i*7-(S.x%7)+112)%112)/112;
@@ -459,30 +465,47 @@ function drawWorld(){
    g.fillStyle='#fff';g.fillRect(w*(0.5-0.015-0.485*p),y,w*(0.03+0.97*p),2+12*p);
   }
  }
- g.fillStyle='#222';
+ // lamp posts with a glowing head
  for(let i=0;i<10;i++){
   const z=((i*30-(S.x%30)+300)%300)/300,p=Math.pow(1-z,2.4);
   const y=hz+(h-hz)*p,hh=10+130*p;
+  g.fillStyle='#222';
   g.fillRect(w*(0.5-0.03-0.5*p)-3*p,y-hh,2+6*p,hh);
   g.fillRect(w*(0.5+0.03+0.5*p),y-hh,2+6*p,hh);
+  if(p>0.04){
+   g.fillStyle='rgba(255,210,140,0.85)';g.shadowColor='#fc8';g.shadowBlur=14*p;
+   g.beginPath();g.arc(w*(0.5-0.03-0.5*p),y-hh,3+6*p,0,7);g.fill();
+   g.beginPath();g.arc(w*(0.5+0.03+0.5*p)+2*p,y-hh,3+6*p,0,7);g.fill();
+   g.shadowBlur=0;
+  }
  }
 }
 
-// ---- One car seen from behind, scaled by sc ----
+// ---- One car seen from behind, with glossy paint and reflections ----
 function drawCarBody(cx,by,sc,col,roof,shape){
  const bw=[150,165,160,155][shape]*sc,bh=[46,44,34,40][shape]*sc,rh=[34,28,24,30][shape]*sc;
  g.save();
- g.fillStyle='rgba(0,0,0,0.4)';g.beginPath();g.ellipse(cx,by,bw*0.62,bh*0.18,0,0,7);g.fill();
- const bg=g.createLinearGradient(0,by-bh,0,by);bg.addColorStop(0,col);bg.addColorStop(0.5,col);bg.addColorStop(1,'#000');
+ g.fillStyle='rgba(0,0,0,0.45)';g.beginPath();g.ellipse(cx,by,bw*0.62,bh*0.2,0,0,7);g.fill();
+ const bg=g.createLinearGradient(0,by-bh,0,by);bg.addColorStop(0,col);bg.addColorStop(0.45,col);bg.addColorStop(1,'#000');
  g.fillStyle=bg;g.fillRect(cx-bw/2,by-bh,bw,bh*0.9);
+ // glossy sky reflection across the boot lid
+ const rf=g.createLinearGradient(0,by-bh,0,by-bh*0.55);
+ rf.addColorStop(0,'rgba(255,200,150,0.55)');rf.addColorStop(1,'rgba(255,200,150,0)');
+ g.fillStyle=rf;g.fillRect(cx-bw/2,by-bh,bw,bh*0.45);
  g.fillStyle=roof;g.beginPath();g.moveTo(cx-bw*0.34,by-bh);g.lineTo(cx-bw*0.26,by-bh-rh);g.lineTo(cx+bw*0.26,by-bh-rh);g.lineTo(cx+bw*0.34,by-bh);g.fill();
- g.fillStyle='rgba(120,170,220,0.55)';g.beginPath();g.moveTo(cx-bw*0.28,by-bh-2*sc);g.lineTo(cx-bw*0.22,by-bh-rh+3*sc);g.lineTo(cx+bw*0.22,by-bh-rh+3*sc);g.lineTo(cx+bw*0.28,by-bh-2*sc);g.fill();
- g.fillStyle='rgba(255,255,255,0.18)';g.fillRect(cx-bw/2,by-bh*0.85,bw,bh*0.1);
- g.fillStyle='#ff2a2a';g.shadowColor='#f22';g.shadowBlur=12*sc;
- g.fillRect(cx-bw*0.48,by-bh*0.6,bw*0.16,bh*0.18);g.fillRect(cx+bw*0.32,by-bh*0.6,bw*0.16,bh*0.18);
+ const wg=g.createLinearGradient(0,by-bh-rh,0,by-bh);wg.addColorStop(0,'rgba(255,170,110,0.65)');wg.addColorStop(1,'rgba(40,60,90,0.8)');
+ g.fillStyle=wg;g.beginPath();g.moveTo(cx-bw*0.28,by-bh-2*sc);g.lineTo(cx-bw*0.22,by-bh-rh+3*sc);g.lineTo(cx+bw*0.22,by-bh-rh+3*sc);g.lineTo(cx+bw*0.28,by-bh-2*sc);g.fill();
+ // body crease highlight
+ g.fillStyle='rgba(255,255,255,0.22)';g.fillRect(cx-bw/2,by-bh*0.82,bw,bh*0.07);
+ // bumper and diffuser
+ g.fillStyle='rgba(0,0,0,0.55)';g.fillRect(cx-bw*0.5,by-bh*0.28,bw,bh*0.2);
+ // glowing tail lights
+ g.fillStyle='#ff2a2a';g.shadowColor='#f22';g.shadowBlur=18*sc;
+ g.fillRect(cx-bw*0.48,by-bh*0.62,bw*0.18,bh*0.2);g.fillRect(cx+bw*0.30,by-bh*0.62,bw*0.18,bh*0.2);
  g.shadowBlur=0;
+ // tyres
  g.fillStyle='#0a0a0a';
- g.fillRect(cx-bw*0.46,by-bh*0.22,bw*0.16,bh*0.34);g.fillRect(cx+bw*0.30,by-bh*0.22,bw*0.16,bh*0.34);
+ g.fillRect(cx-bw*0.47,by-bh*0.24,bw*0.17,bh*0.36);g.fillRect(cx+bw*0.30,by-bh*0.24,bw*0.17,bh*0.36);
  if(shape>=2){g.fillStyle='#111';g.fillRect(cx-bw*0.4,by-bh-rh*0.8,bw*0.8,4*sc);g.fillRect(cx-bw*0.3,by-bh-rh*0.8,3*sc,rh*0.8);g.fillRect(cx+bw*0.3-3*sc,by-bh-rh*0.8,3*sc,rh*0.8)}
  g.restore();
 }
@@ -496,6 +519,23 @@ function drawRival(){
  const p=Math.pow(1-Math.min(0.98,Math.max(0,dd)/170),2.2);
  const y=hz+(h-hz)*p,sc=0.05+p*2.6*(h/700);
  drawCarBody(w*(0.5-0.07-0.30*p),y,sc,R.col,R.roof,R.shape);
+}
+
+// ---- Tyre smoke on the launch, and heat haze behind the car ----
+function updateSmoke(dt){
+ const S=sim;
+ if(S&&S.started&&S.t<2.2&&S.throttle>0.7&&camView!==0){
+  for(let i=0;i<3;i++)smoke.push({x:cv.width*(camView===1?0.62:0.5)+(Math.random()-0.5)*cv.width*0.12,y:cv.height*0.86,vx:(Math.random()-0.5)*40,vy:-20-Math.random()*40,r:10+Math.random()*16,a:0.55});
+ }
+ smoke.forEach(p=>{p.x+=p.vx*dt;p.y+=p.vy*dt;p.r+=40*dt;p.a-=0.55*dt});
+ smoke=smoke.filter(p=>p.a>0);
+}
+function drawSmoke(){
+ smoke.forEach(p=>{
+  const gg=g.createRadialGradient(p.x,p.y,0,p.x,p.y,p.r);
+  gg.addColorStop(0,'rgba(230,230,235,'+p.a+')');gg.addColorStop(1,'rgba(230,230,235,0)');
+  g.fillStyle=gg;g.beginPath();g.arc(p.x,p.y,p.r,0,7);g.fill();
+ });
 }
 
 // ---- Traffic for free roam ----
@@ -515,11 +555,11 @@ function drawTraffic(){
  });
 }
 
-// ---- Gauges ----
+// ---- Gauges with glass shine ----
 function drawGauge(cx,cy,r,val,max,label,redFrom){
  g.save();g.translate(cx,cy);
  g.fillStyle='#050505';g.beginPath();g.arc(0,0,r,0,7);g.fill();
- g.strokeStyle='#555';g.lineWidth=3;g.stroke();
+ g.strokeStyle='#666';g.lineWidth=4;g.stroke();
  for(let i=0;i<=10;i++){
   const a=Math.PI*0.75+i/10*Math.PI*1.5;
   g.strokeStyle=(redFrom&&i/10>=redFrom)?'#f33':'#ddd';g.lineWidth=2;
@@ -528,8 +568,12 @@ function drawGauge(cx,cy,r,val,max,label,redFrom){
   g.fillText(Math.round(i/10*max),Math.cos(a)*r*0.65,Math.sin(a)*r*0.65+4);
  }
  const a=Math.PI*0.75+Math.min(1,Math.max(0,val/max))*Math.PI*1.5;
- g.strokeStyle='#f60';g.lineWidth=3;g.beginPath();g.moveTo(0,0);g.lineTo(Math.cos(a)*r*0.85,Math.sin(a)*r*0.85);g.stroke();
+ g.strokeStyle='#f60';g.lineWidth=3;g.shadowColor='#f60';g.shadowBlur=8;
+ g.beginPath();g.moveTo(0,0);g.lineTo(Math.cos(a)*r*0.85,Math.sin(a)*r*0.85);g.stroke();g.shadowBlur=0;
  g.fillStyle='#aaa';g.font=(r*0.15)+'px monospace';g.fillText(label,0,r*0.5);
+ // glass shine
+ const sh=g.createLinearGradient(-r,-r,r,r);sh.addColorStop(0,'rgba(255,255,255,0.14)');sh.addColorStop(0.5,'rgba(255,255,255,0)');
+ g.fillStyle=sh;g.beginPath();g.arc(0,0,r,0,7);g.fill();
  g.restore();
 }
 
@@ -540,6 +584,9 @@ function drawCockpit(){
  g.save();g.translate(shake,sink);
  const dg=g.createLinearGradient(0,h*0.62,0,h);dg.addColorStop(0,gold?'#2a2208':'#1c1c1f');dg.addColorStop(1,'#050505');
  g.fillStyle=dg;g.beginPath();g.moveTo(0,h*0.72);g.quadraticCurveTo(w/2,h*0.58,w,h*0.72);g.lineTo(w,h);g.lineTo(0,h);g.fill();
+ // sun reflection on the dash top
+ const dr=g.createLinearGradient(0,h*0.6,0,h*0.74);dr.addColorStop(0,'rgba(255,170,100,0.22)');dr.addColorStop(1,'rgba(255,170,100,0)');
+ g.fillStyle=dr;g.beginPath();g.moveTo(0,h*0.72);g.quadraticCurveTo(w/2,h*0.58,w,h*0.72);g.lineTo(w,h*0.78);g.lineTo(0,h*0.78);g.fill();
  g.fillStyle='#0a0a0a';
  g.beginPath();g.moveTo(0,0);g.lineTo(w*0.09,0);g.lineTo(w*0.02,h*0.7);g.lineTo(0,h*0.72);g.fill();
  g.beginPath();g.moveTo(w,0);g.lineTo(w*0.91,0);g.lineTo(w*0.98,h*0.7);g.lineTo(w,h*0.72);g.fill();
@@ -565,12 +612,13 @@ function drawCockpit(){
  if(mode==='race'&&S.lights<4&&!S.falseStart){
   for(let i=0;i<3;i++){
    g.fillStyle=S.lights>i?'#fc0':'#222';
-   g.beginPath();g.arc(w/2,h*0.18+i*h*0.06,h*0.022,0,7);g.fill();
+   if(S.lights>i){g.shadowColor='#fc0';g.shadowBlur=16}
+   g.beginPath();g.arc(w/2,h*0.18+i*h*0.06,h*0.022,0,7);g.fill();g.shadowBlur=0;
   }
  }
- if(mode==='race'&&S.lights>=4){g.fillStyle='#0f4';g.beginPath();g.arc(w/2,h*0.18,h*0.03,0,7);g.fill()}
+ if(mode==='race'&&S.lights>=4){g.fillStyle='#0f4';g.shadowColor='#0f4';g.shadowBlur=20;g.beginPath();g.arc(w/2,h*0.18,h*0.03,0,7);g.fill();g.shadowBlur=0}
  if(S.falseStart){
-  for(let i=0;i<3;i++){g.fillStyle='#f00';g.beginPath();g.arc(w/2,h*0.18+i*h*0.06,h*0.022,0,7);g.fill()}
+  for(let i=0;i<3;i++){g.fillStyle='#f00';g.shadowColor='#f00';g.shadowBlur=16;g.beginPath();g.arc(w/2,h*0.18+i*h*0.06,h*0.022,0,7);g.fill();g.shadowBlur=0}
  }
  // shifter and hand
  const lx=w*0.66,ly=h*0.95;
@@ -584,7 +632,6 @@ function drawCockpit(){
  g.fillStyle='#b88660';
  for(let i=0;i<4;i++){g.beginPath();g.ellipse(kx-h*0.03+i*h*0.016,ky-h*0.03,h*0.008,h*0.016,0,0,7);g.fill()}
  g.restore();
- // gold car trim and neon interior
  if(gold){
   const t=performance.now()/1000,hue=(t*40)%360;
   g.strokeStyle='#ffd24a';g.lineWidth=4;g.beginPath();g.moveTo(0,h*0.72);g.quadraticCurveTo(w/2,h*0.58,w,h*0.72);g.stroke();
@@ -627,7 +674,7 @@ function drawEffects(){
  }
  g.textAlign='left';g.fillStyle='#fff';g.font='20px monospace';
  if(mode==='race'){
-  g.fillText('LEVEL '+save.level+'  vs '+rival().n+'   ET '+S.t.toFixed(2)+'s   '+Math.max(0,dist-S.x).toFixed(0)+' m to go',20,30);
+  g.fillText('LEVEL '+save.level+' vs '+rival().n+'  PR '+myPR()+' vs '+rivalPR(save.level)+'   ET '+S.t.toFixed(2)+'s   '+Math.max(0,dist-S.x).toFixed(0)+' m',20,30);
   g.textAlign='center';
   if(!S.started&&!S.finished){
    g.font='18px monospace';
@@ -719,15 +766,16 @@ function drawEnding(){
  if(sim.endT>8){g.fillStyle='#0f6';g.fillText('Tap anywhere to continue',w/2,h*0.88)}
 }
 
-// ---- Menu ----
-function specLine(c){return c.hp+' hp | '+c.mass+' kg | grip '+c.grip.toFixed(2)+' | '+c.gears.length+' speed | '+(c.hp/c.mass*1000).toFixed(0)+' hp per tonne'}
+// ---- Menu with PR display ----
+function specLine(c){return 'PR '+c.pr+' | '+c.hp+' hp | '+c.mass+' kg | grip '+c.grip.toFixed(2)+' | '+(c.hp/c.mass*1000).toFixed(0)+' hp per tonne'}
 function toMenu(){
- mode='menu';sim=null;traffic=[];destroyEngineSound();
+ mode='menu';sim=null;traffic=[];smoke=[];destroyEngineSound();
  const m=document.getElementById('menu');m.classList.remove('hide');
- const c=CARS[save.car],L=Math.min(save.level,16),need=carForLevel(L);
+ const c=CARS[save.car],L=Math.min(save.level,16);
+ const mine=myPR(),theirs=rivalPR(L),ok=canWin(L);
  let html='<h1>DRAG RACING SIM</h1><h3>Cash: $'+save.cash+'  |  Car: '+c.n+'  |  Career level: '+L+(save.done?' (COMPLETE)':'')+'</h3>';
  html+='<h3>Career race: level '+L+' vs '+RIVALS[Math.min(15,L-1)].n+'</h3>';
- if(need!==save.car)html+='<p style="color:#fa0">Level '+L+' needs the '+CARS[need].n+(save.owned.includes(need)?'. Select it in the garage.':'. Buy it in the garage first.')+'</p>';
+ html+='<p>Your power rating: <b>'+mine+'</b> &nbsp; Rival: <b>'+theirs+'</b> &nbsp; <span style="color:'+(ok?'#0f6':'#f55')+'">'+(ok?'You can win this':(L===16&&(save.car!==GOLD_ID||lvl('goldturbo')<1)?'Need the Golden Godzilla with the Golden Turbo':'Need '+(theirs+1-mine)+' more PR'))+'</span></p>';
  html+='<button onclick="dist=402;startRace()">Race quarter mile</button><button onclick="dist=805;startRace()">Race half mile</button>';
  if(save.level>1)html+='<button onclick="save.level--;store();toMenu()">Replay easier level</button>';
  html+='<h3>Free roam</h3><button onclick="startFree()">Cruise the highway</button>';
@@ -737,18 +785,17 @@ function toMenu(){
   const own=save.owned.includes(i);
   html+='<div><button onclick="buyCar('+i+')">'+car.n+(own?(save.car===i?' (driving)':' (owned, select)'):' - $'+car.price)+'</button><br><small style="color:#8cf">'+specLine(car)+'</small></div>';
  });
- html+='<h3>Upgrades for '+c.n+'</h3><small style="color:#8cf">Each car has its own upgrades.</small><br>';
+ html+='<h3>Upgrades for '+c.n+'</h3><small style="color:#8cf">Each car has its own upgrades. The number after + is the PR it adds per level.</small><br>';
  UPG.forEach(u=>{
   if(u==='goldturbo'){
    if(!save.gold||save.car!==GOLD_ID)return;
-   html+='<button onclick="buyUp(\'goldturbo\')" style="border-color:gold;color:gold">Golden Turbo '+(lvl(u)>=1?'INSTALLED':'- $'+GOLD_TURBO_COST)+'</button>';
+   html+='<button onclick="buyUp(\'goldturbo\')" style="border-color:gold;color:gold">Golden Turbo +60 PR '+(lvl(u)>=1?'INSTALLED':'- $'+GOLD_TURBO_COST)+'</button>';
    return;
   }
   const l=lvl(u);
-  html+='<button onclick="buyUp(\''+u+'\')">'+u+' L'+l+(l>=5?' MAX':' - $'+upCost(u))+'</button>';
+  html+='<button onclick="buyUp(\''+u+'\')">'+u+' L'+l+' (+'+PR_PER[u]+' PR)'+(l>=MAXL?' MAX':' - $'+upCost(u))+'</button>';
  });
  html+='<p>Slide up on the right to accelerate. Hold the throttle at the lights for launch control. UP and DOWN shift. NOS is nitrous. VIEW changes camera. MENU leaves a race.</p>';
- // dev code box at the bottom
  html+='<hr style="border-color:#333"><p style="color:#888">Dev code</p><input id="devcode" type="text" autocapitalize="characters" autocomplete="off" placeholder="enter code" style="font-size:20px;padding:12px;background:#111;color:#fff;border:1px solid #555"><button onclick="devUnlock()">Unlock</button><span id="devmsg" style="color:#0f6"></span><br><br>';
  m.innerHTML=html;
 }
@@ -760,7 +807,7 @@ function devUnlock(){
   save.gold=true;
   save.owned=[0,1,2,3,4,5];
   for(let c=0;c<CARS.length;c++){
-   UPG.forEach(u=>{save.up[c+u]=(u==='goldturbo')?(c===GOLD_ID?1:0):5});
+   UPG.forEach(u=>{save.up[c+u]=(u==='goldturbo')?(c===GOLD_ID?1:0):MAXL});
   }
   save.cash=Math.max(save.cash,1000000);
   save.level=16;
@@ -782,7 +829,7 @@ function buyUp(u){
   toMenu();return;
  }
  const l=lvl(u),cost=upCost(u);
- if(l<5&&save.cash>=cost){save.cash-=cost;save.up[save.car+u]=l+1;store()}
+ if(l<MAXL&&save.cash>=cost){save.cash-=cost;save.up[save.car+u]=l+1;store()}
  toMenu();
 }
 
@@ -795,11 +842,13 @@ function loop(now){
   raceFlow(dt);
   if(!sim)return requestAnimationFrame(loop);
   step(dt);
+  updateSmoke(dt);
   soundUpdate();
   drawWorld();
   if(mode==='free')drawTraffic();
   drawRival();
   drawOwnCar();
+  drawSmoke();
   if(camView===0)drawCockpit();
   drawEffects();
   drawTouchUI();
